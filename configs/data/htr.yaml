@@ -1,0 +1,4 @@
+defaults:
+  - train: train_config
+  - val: val_config
+  - test: test_config

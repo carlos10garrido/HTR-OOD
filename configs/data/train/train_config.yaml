@@ -1,0 +1,31 @@
+defaults: 
+  - train_config: train
+
+# Put your dataset configs here
+train_config:
+  _target_: src.data.data_config.DataConfig
+  stage: train
+  img_size: [64,256]
+  batch_size: 128
+  num_workers: 8
+  pin_memory: False
+  vocab_path: ${paths.data_dir}/vocab.txt
+  transforms:
+    - _target_: torchvision.transforms.v2.Compose
+      transforms:
+        - _target_: torchvision.transforms.v2.ToTensor
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.7
+        #   transforms:
+        #     - _target_: torchvision.transforms.v2.RandomAffine
+        #       degrees: [0, 0]
+        #       translate: [0.05, 0.05]
+        #       scale: [0.9, 0.9]
+        #       shear: [-2, 2, -2, 2]
+        #       fill: 1
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 1.0
+        #   transforms: # Add padding transformation
+        #     - _target_: torchvision.transforms.v2.Pad
+        #       padding: 5
+        #       fill: 1

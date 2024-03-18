@@ -1,0 +1,16 @@
+defaults: 
+  - test_config: test
+
+# Put your dataset configs here
+test_config:
+  _target_: src.data.data_config.DataConfig
+  stage: test
+  img_size: [64,128]
+  batch_size: 32
+  num_workers: 4
+  pin_memory: True
+  vocab_path: ${paths.data_dir}/vocab.txt
+  transforms:
+    - _target_: torchvision.transforms.v2.Compose
+      transforms:
+        - _target_: torchvision.transforms.v2.ToTensor
