@@ -114,7 +114,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
 
     model = CRNN_CTC_Module.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
     # Train the model
-    trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader(), ckpt_path=ckpt_path)
+    trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
     
 
     # Predict iterating over images
