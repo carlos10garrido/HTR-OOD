@@ -12,6 +12,8 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Iterable, List
 from fontTools.ttLib import TTFont
 
+from unidecode import unidecode
+
 PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
 # 'pad_token_id': 1, bos_token_id': 0,  'eos_token_id': 2,
 # Old: ['<pad>', '<sos>', '<eos>', '<unk>']
@@ -21,7 +23,8 @@ PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
 
 # tokenize only separing per characters 
 def tokenize(text):
-    return list(text)
+    # return list(text)
+    return list(unidecode(text))
 
 # helper function to club together sequential operations
 def sequential_transforms(*transforms):
@@ -133,24 +136,57 @@ def read_data_IAM(images_path, lines_path, files):
     images_paths, lines = [], []
     # print(f'Files {files}')
     for file in files:
-        filepath = lines_path + file + ".xml"
-        tree = ET.parse(filepath)
-        root = tree.getroot()
-        root_image = file.split("-")[0] + '/'
+      filepath = lines_path + file + ".xml"
+      tree = ET.parse(filepath)
+      root = tree.getroot()
+      root_image = file.split("-")[0] + '/'
 
-        # Get the lines
-        for line   in root.iter("line"):
-            text, image_id = line.attrib.get("text"), line.attrib.get("id")
-            # Replace &quot with "
-            text = text.replace("&quot;", "\"")
-            image_path = images_path + '/' + root_image + "-".join(image_id.split("-")[:2]) + "/" + image_id + ".png"
+      # Get the lines
+      for line in root.iter("line"):
+        text, image_id = line.attrib.get("text"), line.attrib.get("id")
+        # Replace &quot with "
+        text = text.replace("&quot;", "\"")
+        image_path = images_path + '/' + root_image + "-".join(image_id.split("-")[:2]) + "/" + image_id + ".png"
 
-            # Check if image_path exists
-            if os.path.exists(image_path):
-                images_paths.append(image_path)
-                lines.append(text)
+          # Check if image_path exists
+        if os.path.exists(image_path):
+            images_paths.append(image_path)
+            lines.append(text)
 
     return images_paths, lines
+
+def read_data_rimes(images_path, lines_path, files):
+  # Read files from .txt files
+  images_paths, lines = [], []
+
+  for file in files:
+    image_path = images_path + file + ".jpg"
+    line_path = lines_path + file + ".txt"
+
+    # Read lines from .txt files
+    with open(line_path, "r") as f:
+      line = f.read().replace("\n", "")
+      lines.append(line)
+      images_paths.append(image_path)
+    
+  return images_paths, lines
+
+
+def read_data_bentham(images_path, lines_path, files):
+    images_paths, lines = [], []
+
+    for file in files:
+        image_path = images_path + file + ".png"
+        line_path = lines_path + file + ".txt"
+
+        # Read lines from .txt files
+        with open(line_path, "r") as f:
+          line = f.read().replace("\n", "")
+          lines.append(line)
+          images_paths.append(image_path)
+
+    return images_paths, lines
+
 
 def convert_text_washington(text):
     text = text.replace("-", "").replace("|", " ")
@@ -162,86 +198,84 @@ def convert_text_washington(text):
     text = text.replace("s_", "")
     return text
 
-def read_data_washington(images_path, words_path, files):
-    images_paths, words = [], []
+def read_data_washington(images_path, lines_paths, files):
+    images_paths, lines = [], []
 
     # Convert files list to a set
     files = set(files)
 
     # Read words from word_labels.txt
-    with open(words_path + "word_labels.txt", "r") as f:
-        for line in f:
-            image_id, text = line.split(" ")
-            image_id_split = image_id.split("-")
+    with open(lines_paths + "transcription.txt", "r") as f:
+      for line in f:
+        image_id, text = line.split(" ")
 
-            # Remove \n if exists in the text
-            text = text.replace("\n", "")
-            file = "-".join(image_id_split[:2])
+        # Remove \n if exists in the text
+        text = text.replace("\n", "")
+        file = image_id 
+        # file = "-".join(image_id_split[:2])
 
-            # Check if first_part is in files
-            if file in files:
-                image_path = images_path + image_id + ".png"
-                text = convert_text_washington(text)
+        # Check if first_part is in files
+        if file in files:
+          image_path = images_path + image_id + ".png"
+          text = convert_text_washington(text)
 
-                # Check if image_path exists
-                if os.path.exists(image_path):
-                    images_paths.append(image_path)
-                    words.append(text)
+          # Check if image_path exists
+          if os.path.exists(image_path):
+              images_paths.append(image_path)
+              lines.append(text)
 
-    return images_paths, words
+    return images_paths, lines
 
-# TODO
-def read_data_washington_lines(images_path, words_path, files):
-    images_paths, words = [], []
 
-    # Convert files list to a set
-    files = set(files)
-
-    # Read words from transcription.txt TODO
-    with open(words_path + "transcription.txt", "r") as f:
-        for line in f:
-            image_id, text = line.split(" ")
-            image_id_split = image_id.split("-")
-
-            # Remove \n if exists in the text
-            text = text.replace("\n", "")
-            file = "-".join(image_id_split[:2])
-
-            # Check if first_part is in files
-            if file in files:
-                image_path = images_path + image_id + ".png"
-                text = convert_text_washington(text)
-
-                # Check if image_path exists
-                if os.path.exists(image_path):
-                    images_paths.append(image_path)
-                    words.append(text)
-
-    return images_paths, words
-    
-def read_data_saint_gall(images_path, words_path, files):
-    images_paths, words = [], []
+def read_data_saint_gall(images_path, lines_paths, files):
+    images_paths, lines = [], []
 
     # Convert files list to a set
     files = set(files)
-    # print(f'Files {files}')
 
     # Read words from transcriptions.txt
-    with open(words_path + "transcription.txt", "r") as f:
-        for line in f:
-            image_id, text = line.split(" ")[0], line.split(" ")[1]
-            if image_id in files:
-                line_words = text.split("|")
-                for idx, word in enumerate(line_words):
-                    image_path = images_path + image_id + "-" + str(idx) + ".png"
-                    # Check if image_path exists
-                    if os.path.exists(image_path):
-                        images_paths.append(image_path)
-                        word = word.replace("-", "").replace("|", "")
-                        word = word.replace("-pt", ".")
-                        words.append(word)
+    with open(lines_paths + "transcription.txt", "r") as f:
+      for line in f:
+        image_id, text = line.split(" ")[0], line.split(" ")[1]
+        file = '-'.join(image_id.split('-')[:2]) # Get first two parts of the image_id that corresponds to a line
+        image_path = images_path + image_id + ".png"
+        text = text.replace("\n", "")
+        text = text.replace("-", "").replace("|", " ")
+        text = text.replace("s_pt", ".").replace("s_cm", ",")
 
-    return images_paths, words
+        # Check if folder is in files 
+        if file in files:
+          images_paths.append(image_path)
+          lines.append(text)
+
+    return images_paths, lines
+
+def read_data_rodrigo(images_path, lines_paths, files):
+    images_paths, lines = [], []
+
+    # Convert files list to a set
+    files = set(files)
+
+    # Read words from word_labels.txt
+    with open(lines_paths + "transcriptions.txt", "r") as f:
+      for line in f:
+        # Rodrigo_00006_00 blablabla
+        image_id, text = line[:16], line[17:]
+
+        # Remove \n if exists in the text
+        text = text.replace("\n", "")
+        file = image_id
+
+        # Check if first_part is in files
+        if file in files:
+          image_path = images_path + image_id + ".png"
+
+          # Check if image_path exists
+          if os.path.exists(image_path):
+              images_paths.append(image_path)
+              lines.append(text)
+
+    return images_paths, lines
 
 def read_data_esposalles(images_path, words_path, files):
     images_paths, words = [], []
