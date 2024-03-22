@@ -19,7 +19,7 @@ scheduler: null
 
 net: 
   _target_: src.models.components.crnn_ctc_puig.CRNN_Puig 
-  input_size: 640
+  input_size: 1280 
   hidden_size: 256
   num_layers: 5
   vocab_size: 101
