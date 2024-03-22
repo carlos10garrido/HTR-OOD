@@ -16,9 +16,6 @@ import os
 import src
 import wandb
 import torchvision
-from src.models.transformers_seg import SegTransformerLitModule 
-
-
 
 class CRNN_CTC_Module(LightningModule):
     def __init__(
@@ -43,7 +40,7 @@ class CRNN_CTC_Module(LightningModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False)
+        self.save_hyperparameters(logger=False, ignore=("datasets"))
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
@@ -58,6 +55,7 @@ class CRNN_CTC_Module(LightningModule):
         self.train_cer = CER()
 
         self.val_cer_minus = CER()
+        self.test_cer_minus = CER()
         self.net = net
         self.encode = src.data.htr_datamodule.encode
         self.decode = src.data.htr_datamodule.decode
@@ -166,7 +164,7 @@ class CRNN_CTC_Module(LightningModule):
             _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token            
             _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
 
-            cer = CER()(_pred_, _label_)
+            cer = CER()(_pred, _label)
 
             # Log training image and predictions
             orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
@@ -191,14 +189,13 @@ class CRNN_CTC_Module(LightningModule):
         pass
 
 
-    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> None:
         """Perform a single validation step on a batch of data from the validation set."""
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
         labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
-        dataloader_idx = 0 if len(self.val_datasets) == 1 else dataloader_idx
         dataset = self.val_datasets[dataloader_idx]
 
         preds = self.net(images).squeeze(-1).clone().argmax(-1)
@@ -219,6 +216,7 @@ class CRNN_CTC_Module(LightningModule):
           _pred_minus = _pred.lower()
           cer_minus = self.val_cer_minus.forward(_pred_minus, _label_minus)
           self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
+          self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
 
           # Calculate CER
           cer = CER()(_pred, _label)
@@ -250,7 +248,7 @@ class CRNN_CTC_Module(LightningModule):
         self.log(f'val/cer_epoch_minusc', val_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/wer_epoch_minusc', val_wer_minus, sync_dist=True, prog_bar=True)
         
-    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
+    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> None:
       """Perform a single TEST step on a batch of data from the TEST set."""
       images, labels = batch[0], batch[1]
       labels = labels.permute(1, 0)
@@ -275,21 +273,8 @@ class CRNN_CTC_Module(LightningModule):
         _label = labels[i].detach().cpu().numpy().tolist()
         _pred = torch.unique_consecutive(preds[i].detach()).cpu().numpy().tolist()
         _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token
-        
-        _label = self.decode(_label)
-        _pred = self.decode(_pred)
-        _label_, _pred_ = "", ""
-        for l in range(len(_label)):
-          if _label[l] == '<eos>' or _label[l] == '<sos>' or _label[l] == '<pad>':
-            break
-          _label_ += _label[l]
 
-        for l in range(len(_pred)):
-          if _pred[l] == '<eos>' or _pred[l] == '<sos>' or _pred[l] == '<pad>':
-            break
-          _pred_ += _pred[l]
-        
-        _label, _pred = _label_, _pred_
+        _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
 
         print(f'Label: {_label} - Pred: {_pred}')
 
@@ -314,10 +299,11 @@ class CRNN_CTC_Module(LightningModule):
 
       print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
       
-      
+
     def on_test_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
-        test_cer_epoch = self.metric_logger.log_test_metrics()
+        test_cer_epoch, test_wer_epoch = self.metric_logger.log_test_metrics()
+        test_cer_epoch = test_cer_epoch.values()
         print(f'test/cer_epoch: {test_cer_epoch}')
         self.log(f'test/cer_epoch', test_cer_epoch, sync_dist=True, prog_bar=True)
 
