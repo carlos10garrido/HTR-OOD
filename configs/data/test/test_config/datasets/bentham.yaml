@@ -1,0 +1,7 @@
+bentham:
+  _target_: src.data.data_config.DatasetConfig
+  name: bentham
+  images_path: ${paths.data_dir}/htr_datasets/bentham/BenthamDatasetR0-GT/Images/Lines/
+  labels_path: ${paths.data_dir}/htr_datasets/bentham/BenthamDatasetR0-GT/Transcriptions/
+  splits_path: ${paths.data_dir}/htr_datasets/bentham/BenthamDatasetR0-GT/Partitions/test.txt
+  read_data: src.data.data_utils.read_data_bentham

@@ -1,7 +1,7 @@
 saint_gall:
   _target_: src.data.data_config.DatasetConfig
   name: saint_gall
-  images_path: ${paths.data_dir}/saint-gall/data/words_images_normalized/
-  labels_path: ${paths.data_dir}/saint-gall/ground_truth/
-  splits_path: ${paths.data_dir}/saint-gall/sets/val.txt
+  images_path: ${paths.data_dir}/htr_datasets/saint_gall/saintgalldb-v1.0/data/line_images_normalized/
+  labels_path: ${paths.data_dir}/htr_datasets/saint_gall/saintgalldb-v1.0/ground_truth/
+  splits_path: ${paths.data_dir}/htr_datasets/saint_gall/saintgalldb-v1.0/sets/val.txt
   read_data: src.data.data_utils.read_data_saint_gall

@@ -1,0 +1,7 @@
+rimes:
+  _target_: src.data.data_config.DatasetConfig
+  name: RIMES
+  images_path: ${paths.data_dir}/htr_datasets/RIMES/RIMES-2011-Lines/Images/
+  labels_path: ${paths.data_dir}/htr_datasets/RIMES/RIMES-2011-Lines/Transcriptions/
+  splits_path: ${paths.data_dir}/htr_datasets/RIMES/RIMES-2011-Lines/Sets/test.txt
+  read_data: src.data.data_utils.read_data_rimes 
