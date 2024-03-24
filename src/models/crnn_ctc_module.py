@@ -168,7 +168,7 @@ class CRNN_CTC_Module(LightningModule):
 
             # Log training image and predictions
             orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+            self._logger.experiment.log({f'train/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
         self.metric_logger.log_train_step(loss, torch.tensor([0.0]))
 
