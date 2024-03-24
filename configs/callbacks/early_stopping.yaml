@@ -2,7 +2,7 @@
 
 early_stopping:
   _target_: lightning.pytorch.callbacks.EarlyStopping
-  monitor: "val/cer_epoch" # quantity to be monitored, must be specified !!!
+  monitor: "val/mean_cer" # quantity to be monitored, must be specified !!!
   min_delta: 0.01 # minimum change in the monitored quantity to qualify as an improvement
   patience: 100 # number of checks with no improvement after which training will be stopped
   verbose: True # verbosity mode
