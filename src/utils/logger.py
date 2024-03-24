@@ -92,6 +92,8 @@ class MetricLogger():
     self.train_accs = []
 
   def log_val_metrics(self):
+    """Log validation metrics and return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer."""
+
     val_loss, val_acc, val_cer, val_wer = {}, {}, {}, {}
 
     # Compute losses, accuracies and CERs per dataset
@@ -138,6 +140,7 @@ class MetricLogger():
         self.logger.experiment.log({f'best_val_cer_' + dataset: self.best_val_cers[dataset], 'epoch': self.current_epoch})
 
     total_val_cer /= count_nonzero
+    mean_val_cer = total_val_cer
     print(f'TOTAL VAL CER = {total_val_cer}')
 
     # Compute mean of means for WER
@@ -153,9 +156,8 @@ class MetricLogger():
         self.logger.experiment.log({f'best_val_wer_' + dataset: self.best_val_wers[dataset], 'epoch': self.current_epoch})
 
     total_val_wer /= count_nonzero
-    print(f'TOTAL VAL WER = {total_val_wer}')
-
-
+    mean_val_wer = total_val_wer 
+    print(f'TOTAL VAL WER = {mean_val_wer}')
     
     # Save best val_cer mean of means for CER
     if total_val_cer < self.mean_best_val_cer:
@@ -170,35 +172,54 @@ class MetricLogger():
       self.logger.experiment.log({f'mean_best_val_wer': self.mean_best_val_wer, 'epoch': self.current_epoch})
 
 
-    # Calculate in-domain and out-of-domain CERs and WERs
-    in_domain_cer, out_of_domain_cer = 0.0, 0.0
-    in_domain_wer, out_of_domain_wer = 0.0, 0.0
+    # Calculate in-domain, out-of-domain, heldout-domain CERs and WERs
+    in_domain_cer, out_of_domain_cer, heldout_domain_cer = 0.0, 0.0, 0.0
+    in_domain_wer, out_of_domain_wer, heldout_domain_wer = 0.0, 0.0, 0.0
 
 
     in_domain_datasets = set(self.train_datasets)
     out_of_domain_datasets = set(self.val_datasets) - set(self.train_datasets)
+    # Heldout = Test (always one) - Train (always one). Val that are not in train and also not in test
+    heldout_domain_datasets = set(self.val_datasets) - set(self.train_datasets) - set(self.test_datasets)
 
     print(f'IN-DOMAIN datasets = {in_domain_datasets}')
     print(f'OUT-OF-DOMAIN datasets = {out_of_domain_datasets}')
+    print(f'HELDOUT-DOMAIN datasets = {heldout_domain_datasets}')
 
     for dataset in in_domain_datasets:
       if dataset in self.val_datasets:
         in_domain_cer += val_cer[dataset] / len(in_domain_datasets)
         in_domain_wer += val_wer[dataset] / len(in_domain_datasets)
 
-    for dataset in out_of_domain_datasets:
-      if dataset in self.val_datasets:
-        out_of_domain_cer += val_cer[dataset] / len(out_of_domain_datasets)
-        out_of_domain_wer += val_wer[dataset] / len(out_of_domain_datasets)
+    if len(out_of_domain_datasets) > 0:
+      for dataset in out_of_domain_datasets:
+        if dataset in self.val_datasets:
+          out_of_domain_cer += val_cer[dataset] / len(out_of_domain_datasets)
+          out_of_domain_wer += val_wer[dataset] / len(out_of_domain_datasets)
+
+
+    # Heldout-domains CER
+    if len(heldout_domain_datasets) > 0:
+      for dataset in heldout_domain_datasets:
+        if dataset in self.val_datasets:
+          heldout_domain_cer += val_cer[dataset] / len(heldout_domain_datasets)
+          heldout_domain_wer += val_wer[dataset] / len(heldout_domain_datasets)
+    
 
     print(f'IN-DOMAIN CER = {in_domain_cer}')
     print(f'OUT-OF-DOMAIN CER = {out_of_domain_cer}')
     print(f'IN-DOMAIN WER = {in_domain_wer}')
     print(f'OUT-OF-DOMAIN WER = {out_of_domain_wer}')
+    print(f'HELDOUT-DOMAIN CER = {heldout_domain_cer}')
+    print(f'HELDOUT-DOMAIN WER = {heldout_domain_wer}')
 
     # self.log('in_domain_cer_epoch', in_domain_cer, on_epoch=True, prog_bar=True, logger=True)
-    self.logger.experiment.log({f'in_domain_val_cer_epoch': in_domain_cer, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'in_domain_val_wer_epoch': in_domain_wer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/in_domain_val_cer_epoch': in_domain_cer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/in_domain_val_wer_epoch': in_domain_wer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/out_of_domain_val_cer_epoch': out_of_domain_cer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/out_of_domain_val_wer_epoch': out_of_domain_wer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/heldout_domain_val_cer_epoch': heldout_domain_cer, 'epoch': self.current_epoch})
+    self.logger.experiment.log({f'val/heldout_domain_val_wer_epoch': heldout_domain_wer, 'epoch': self.current_epoch})
 
     if self.best_in_domain_val_cer > in_domain_cer:
       self.best_in_domain_val_cer = in_domain_cer
@@ -231,72 +252,67 @@ class MetricLogger():
     self.val_cers = {val_dataset: torchmetrics.CharErrorRate() for val_dataset in self.val_datasets}
     self.val_wers = {val_dataset: torchmetrics.WordErrorRate() for val_dataset in self.val_datasets}
 
-    return total_val_cer, total_val_wer
+    # Return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer
+
+    return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer
 
 
   def log_test_metrics(self):
+    """Log test metrics and return test_cers, test_wers."""
     # Calculate test CERs
     mean_cer_test, mean_wer_test = 0.0, 0.0
-    test_cers, test_wers = {}, {}
 
-    for dataset in self.test_datasets:
+    for dataset in self.test_datasets: # Test dataset is always one
       test_cer = self.cer_test[dataset].compute()
       test_cers[dataset] = test_cer
       mean_cer_test += test_cer
       print(f'Test CER on dataset {dataset}: {test_cer}')
+      self.logger.experiment.log({f'test/test_cer_' + dataset: test_cer, 'epoch': self.current_epoch})
 
       test_wer = self.wer_test[dataset].compute()
       test_wers[dataset] = test_wer
       mean_wer_test += test_wer
       print(f'Test WER on dataset {dataset}: {test_wer}')
+      self.logger.experiment.log({f'test/test_wer_' + dataset: test_wer, 'epoch': self.current_epoch})
+      
+      
 
-      self.logger.experiment.log({f'test_cer_' + dataset: test_cer, 'epoch': self.current_epoch})
-      self.logger.experiment.log({f'test_wer_' + dataset: test_wer, 'epoch': self.current_epoch})
+    # # Calculate in-domain and out-of-domain CERs
+    # in_domain_cer, out_of_domain_cer = 0.0, 0.0
+    # in_domain_wer, out_of_domain_wer = 0.0, 0.0
 
-    print(f'Printing test CERs: {test_cers}')
-    print(f'Printing test WERs: {test_wers}')
+    # in_domain_datasets = set(self.train_datasets)
+    # out_of_domain_datasets = set(self.test_datasets) - set(self.train_datasets)
 
-    mean_cer_test /= len(self.test_datasets)
-    mean_wer_test /= len(self.test_datasets)
+    # print(f'IN-DOMAIN datasets = {in_domain_datasets}')
+    # print(f'OUT-OF-DOMAIN datasets = {out_of_domain_datasets}')
 
-    # print(f'Mean CER on test datasets: {mean_cer_test}')    self.log(f'mean_test_cer', mean_cer_test, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-    self.logger.experiment.log({f'mean_test_cer': mean_cer_test, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'mean_test_wer': mean_wer_test, 'epoch': self.current_epoch})
+    # for dataset in in_domain_datasets:
+    #   if dataset in self.test_datasets:
+    #     in_domain_cer += test_cers[dataset] / len(in_domain_datasets)
+    #     in_domain_wer += test_wers[dataset] / len(in_domain_datasets)
 
-    # Calculate in-domain and out-of-domain CERs
-    in_domain_cer, out_of_domain_cer = 0.0, 0.0
-    in_domain_wer, out_of_domain_wer = 0.0, 0.0
+    # for dataset in out_of_domain_datasets:
+    #   if dataset in self.test_datasets:
+    #     out_of_domain_cer += test_cers[dataset] / len(out_of_domain_datasets)
+    #     out_of_domain_wer += test_wers[dataset] / len(out_of_domain_datasets)
 
-    in_domain_datasets = set(self.train_datasets)
-    out_of_domain_datasets = set(self.test_datasets) - set(self.train_datasets)
+    # print(f'IN-DOMAIN CER = {in_domain_cer}')
+    # print(f'OUT-OF-DOMAIN CER = {out_of_domain_cer}')
+    # print(f'IN-DOMAIN WER = {in_domain_wer}')
+    # print(f'OUT-OF-DOMAIN WER = {out_of_domain_wer}')
 
-    print(f'IN-DOMAIN datasets = {in_domain_datasets}')
-    print(f'OUT-OF-DOMAIN datasets = {out_of_domain_datasets}')
+    # # self.log('in_domain_cer_epoch', in_domain_cer, on_epoch=True, prog_bar=True, logger=True)
+    # self.logger.experiment.log({f'test/in_domain_test_cer_epoch': in_domain_cer, 'epoch': self.current_epoch})
+    # self.logger.experiment.log({f'test/in_domain_test_wer_epoch': in_domain_wer, 'epoch': self.current_epoch})
 
-    for dataset in in_domain_datasets:
-      if dataset in self.test_datasets:
-        in_domain_cer += test_cers[dataset] / len(in_domain_datasets)
-        in_domain_wer += test_wers[dataset] / len(in_domain_datasets)
+    # # self.log('out_of_domain_cer_epoch', out_of_domain_cer, on_epoch=True, prog_bar=True, logger=True)
+    # self.logger.experiment.log({f'out_of_domain_test_cer_epoch': out_of_domain_cer, 'epoch': self.current_epoch})
+    # self.logger.experiment.log({f'out_of_domain_test_wer_epoch': out_of_domain_wer, 'epoch': self.current_epoch})
 
-    for dataset in out_of_domain_datasets:
-      if dataset in self.test_datasets:
-        out_of_domain_cer += test_cers[dataset] / len(out_of_domain_datasets)
-        out_of_domain_wer += test_wers[dataset] / len(out_of_domain_datasets)
+    dataset = self.test_datasets[0]
 
-    print(f'IN-DOMAIN CER = {in_domain_cer}')
-    print(f'OUT-OF-DOMAIN CER = {out_of_domain_cer}')
-    print(f'IN-DOMAIN WER = {in_domain_wer}')
-    print(f'OUT-OF-DOMAIN WER = {out_of_domain_wer}')
-
-    # self.log('in_domain_cer_epoch', in_domain_cer, on_epoch=True, prog_bar=True, logger=True)
-    self.logger.experiment.log({f'in_domain_test_cer_epoch': in_domain_cer, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'in_domain_test_wer_epoch': in_domain_wer, 'epoch': self.current_epoch})
-
-    # self.log('out_of_domain_cer_epoch', out_of_domain_cer, on_epoch=True, prog_bar=True, logger=True)
-    self.logger.experiment.log({f'out_of_domain_test_cer_epoch': out_of_domain_cer, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'out_of_domain_test_wer_epoch': out_of_domain_wer, 'epoch': self.current_epoch})
-
-    return test_cers, test_wers
+    return test_cers[dataset], test_wers[dataset]
 
 
       
