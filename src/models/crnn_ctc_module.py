@@ -100,7 +100,7 @@ class CRNN_CTC_Module(LightningModule):
         self.metric_logger_minusc = MetricLogger(
           logger=self._logger,
           # Append minusc to val_datasets and test_datasets
-          train_datasets=self.train_datasets,
+          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
           val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
           test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
         )
@@ -235,18 +235,19 @@ class CRNN_CTC_Module(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
 
-        val_cer_epoch, val_wer_epoch = self.metric_logger.log_val_metrics()
-        print(f'val/cer_epoch: {val_cer_epoch}')
-        print(f'val/wer_epoch: {val_wer_epoch}')
-        self.log(f'val/cer_epoch', val_cer_epoch, sync_dist=True, prog_bar=True)
-        self.log(f'val/wer_epoch', val_wer_epoch, sync_dist=True, prog_bar=True)
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_val_metrics()
+        print(f'mean_val_cer: {mean_val_cer}')
+        self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        val_cer_minus, val_wer_minus = self.metric_logger_minusc.log_val_metrics()
-        self.log(f'val/cer_minusc', val_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/wer_minusc', val_wer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/cer_epoch_minusc', val_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/wer_epoch_minusc', val_wer_minus, sync_dist=True, prog_bar=True)
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_val_metrics()
+        self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
         
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> None:
       """Perform a single TEST step on a batch of data from the TEST set."""
@@ -301,11 +302,19 @@ class CRNN_CTC_Module(LightningModule):
       
 
     def on_test_epoch_end(self) -> None:
-        "Lightning hook that is called when a validation epoch ends."
-        test_cer_epoch, test_wer_epoch = self.metric_logger.log_test_metrics()
-        test_cer_epoch = test_cer_epoch.values()
-        print(f'test/cer_epoch: {test_cer_epoch}')
-        self.log(f'test/cer_epoch', test_cer_epoch, sync_dist=True, prog_bar=True)
+        mean_test_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_test_metrics()
+        print(f'mean_test_cer: {mean_test_cer}')
+        self.log(f'test/mean_cer', mean_test_cer, sync_dist=True, prog_bar=True)
+        self.log(f'test/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'test/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'test/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        
+        # Log CER minusc
+        mean_test_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_test_metrics()
+        self.log(f'test/mean_cer_minusc', mean_test_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'test/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'test/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'test/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
