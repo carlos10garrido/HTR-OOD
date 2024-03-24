@@ -277,6 +277,37 @@ def read_data_rodrigo(images_path, lines_paths, files):
 
     return images_paths, lines
 
+def read_data_icfhr_2016(images_path, lines_paths, files):
+    images_paths, lines = [], []
+
+    print(f'Files {files}')
+
+    # Convert files list to a set
+    files = set(files)
+
+    # Read words from word_labels.txt
+    with open(lines_paths + "transcriptions.txt", "r") as f:
+      for line in f:
+        image_id, text = line.split(" ", 1)
+        # print(f'Image id-{image_id}.Text-{text}')
+
+        # Remove \n if exists in the text
+        text = text.replace("\n", "")
+        file = image_id 
+        # file = "-".join(image_id_split[:2])
+
+        # Check if first_part is in files
+        if file.split("_")[0] in files:
+          image_path = images_path + image_id + ".png"
+
+          # Check if image_path exists
+          if os.path.exists(image_path):
+              images_paths.append(image_path)
+              lines.append(text)
+
+    return images_paths, lines
+
+
 def read_data_esposalles(images_path, words_path, files):
     images_paths, words = [], []
     # print(f'Files {files}')
