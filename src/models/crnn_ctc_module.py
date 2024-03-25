@@ -302,19 +302,32 @@ class CRNN_CTC_Module(LightningModule):
       
 
     def on_test_epoch_end(self) -> None:
-        mean_test_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_test_metrics()
-        print(f'mean_test_cer: {mean_test_cer}')
-        self.log(f'test/mean_cer', mean_test_cer, sync_dist=True, prog_bar=True)
-        self.log(f'test/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
-        self.log(f'test/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        self.log(f'test/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        test_cer, test_wer = self.metric_logger.log_test_metrics()
+        print(f'test_cer: {test_cer}')
+        print(f'test_wer: {test_wer}')
+        # self.log(f'test/cer_epoch', test_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'test/wer_epoch', test_wer, sync_dist=True, prog_bar=True)
+
+        test_cer_minus, test_wer_minus = self.metric_logger_minusc.log_test_metrics()
+        print(f'test_cer_minus: {test_cer_minus}')
+        print(f'test_wer_minus: {test_wer_minus}')
+        # self.log(f'test/cer_epoch_minusc', test_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'test/wer_epoch_minusc', test_wer_minus, sync_dist=True, prog_bar=True)
+
+
+        # mean_test_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_test_metrics()
+        # print(f'mean_test_cer: {mean_test_cer}')
+        # self.log(f'test/mean_cer', mean_test_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'test/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'test/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'test/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        mean_test_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_test_metrics()
-        self.log(f'test/mean_cer_minusc', mean_test_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'test/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'test/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'test/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+        # mean_test_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_test_metrics()
+        # self.log(f'test/mean_cer_minusc', mean_test_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'test/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'test/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'test/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
