@@ -65,6 +65,7 @@ class TransformerOCR(nn.Module):
         self.patch_per_column = patch_per_column
         self.image_size = image_size
         self.masking_noise = masking_noise
+        self.vocab_size = vocab_size
 
         if self.use_backbone:
             self.num_channels = d_model * (image_size[0] // 8) if self.patch_per_column else d_model
@@ -172,7 +173,7 @@ class TransformerOCR(nn.Module):
         self.model.config.decoder.bos_token_id = 0
         self.model.config.decoder.eos_token_id = 2
         self.model.config.vocab_size = vocab_size
-        self.model.config.max_length = 100
+        self.model.config.max_length = 64
         self.model.config.pad_token_id = 1
         self.model.config.bos_token_id = 0
         self.model.config.eos_token_id = 2
@@ -212,32 +213,13 @@ class TransformerOCR(nn.Module):
         # Change inputs_ids type to match labels type
         input_ids = input_ids.type_as(labels)
 
-        # input_ids requires gradin order to be used as labels
-        # input_ids.requires_grad = True
-
-        # print(f'input_ids.shape: {input_ids.shape}')
-        # print(f'input_ids: {input_ids}')
-        # print(f'labels.shape: {labels.shape}')
-        # print(f'labels: {labels}')
-
-        # Permute input_ids to match model input shape
 
         # Change -100 tokens to pad tokens
         input_ids[input_ids == -100] = self.model.config.decoder.pad_token_id
         # Add bos to input_ids
         input_ids = torch.cat([torch.ones(input_ids.shape[0], 1, dtype=torch.int).to(self.model.device) * self.model.config.decoder.bos_token_id, input_ids], dim=-1)
 
-
-        # Predict using explictly the encoder and decoder
-        # output_encoder = self.encoder(pixel_values=x, output_attentions=True)
-        # output_decoder = self.decoder(input_ids=input_ids, encoder_hidden_states=output_encoder, output_attentions=True)
           
-        # return output_decoder
-
-        # labels.input_ids = input_ids
-
-
-        # breakpoint()
         return self.model(pixel_values=x, decoder_input_ids=input_ids[:, :-1], # -1 for ignoring the last token
                           labels=labels, output_attentions=True, output_hidden_states=True)
     
@@ -257,24 +239,8 @@ class TransformerOCR(nn.Module):
           x = x.unsqueeze(2)
           print(f'x.shape: {x.shape} after flatten')
 
-        # return self.model.generate(x, return_dict_in_generate=True, output_attentions=True, output_hidden_states=True)
-
-        input_ids = torch.ones(x.shape[0], 1, dtype=torch.int).to(self.model.device) * self.model.config.decoder.bos_token_id
-
-        output_encoder = self.model.encoder(pixel_values=x, output_attentions=True, output_hidden_states=True).hidden_states[-1]
-
-        for i in range(100):
-            output_decoder = self.model.decoder(input_ids=input_ids, encoder_hidden_states=output_encoder, output_attentions=True, output_hidden_states=True)
-            logits = output_decoder.logits[:, -1, :]
-            predicted_id = torch.argmax(logits, dim=-1)
-
-            input_ids = torch.cat([input_ids, predicted_id.unsqueeze(1)], dim=-1)
-
-            if torch.all(predicted_id == self.model.config.decoder.eos_token_id):
-                break
         
-        # Return removing the bos token
-        return input_ids[:, 1:]
+        return self.model.generate(x, return_dict_in_generate=True, output_attentions=True, output_hidden_states=True)
 
 
 if __name__ == "__main__":
