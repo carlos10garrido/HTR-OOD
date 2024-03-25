@@ -34,9 +34,8 @@ class HTRTransformerLitModule(LightningModule):
         compile: bool,
         _logger: Any,
         datasets: dict,
-        visualize_attention: bool = False,
     ) -> None:
-        """Initialize a `MNISTLitModule`.
+        """Initialize a `HTRTransformerLitModule`.
 
         :param net: The model to train.
         :param optimizer: The optimizer to use for training.
@@ -46,9 +45,7 @@ class HTRTransformerLitModule(LightningModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False)
-
-        self.visualize_attention = visualize_attention
+        self.save_hyperparameters(logger=False, ignore=("datasets"))
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
@@ -59,35 +56,17 @@ class HTRTransformerLitModule(LightningModule):
         print(f'self.val_datasets: {self.val_datasets}')
         print(f'self.test_datasets: {self.test_datasets}')
 
-        # breakpoint()
-
-        # Create metrics per dataset
-        # Training metrics
         self.train_loss = MeanMetric()
-        # Validation metrics
-        self.val_cer = {}
-        self.min_val_cer = {}
-        for dataset in self.val_datasets:
-            self.val_cer[dataset] = CER()
-            self.min_val_cer[dataset] = MinMetric()
+        self.train_cer = CER()
 
-        # Test metrics
-        self.test_cer = {}
-        self.min_test_cer = {}
-        for dataset in self.test_datasets:
-            self.test_cer[dataset] = CER()
-            self.min_test_cer[dataset] = MinMetric()
-
+        self.val_cer_minus = CER()
+        self.test_cer_minus = CER()
         self.net = net
-
-        # loss function
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=1) # 1 is the padding token
-
-        # self.encode = encode
-        # self.decode = decode
-
         self.encode = src.data.htr_datamodule.encode
         self.decode = src.data.htr_datamodule.decode
+
+        # loss function
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-100) # 1 is the padding token
 
         # metric objects for calculating and averaging accuracy across batches
         log.info(f'Logger in HTRTransformerLitModule: {_logger}. Keys: {list(_logger.keys())}')
@@ -124,24 +103,33 @@ class HTRTransformerLitModule(LightningModule):
           test_datasets=self.test_datasets,
         )
 
+        self.metric_logger_minusc = MetricLogger(
+          logger=self._logger,
+          # Append minusc to val_datasets and test_datasets
+          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
+          val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
+          test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
+        )
 
-    def model_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Perform a single model step on a batch of data.
+    def decode_text(self, text, vocab_size):
+        """Decode the text from the vocabulary."""
 
-        :param batch: A batch of data (a tuple) containing the input tensor of images and target labels.
+        # Check if it is a tensor or a list
+        if isinstance(text, torch.Tensor):
+            text = text.tolist()
+        else:
+            text = text
 
-        :return: A tuple containing (in order):
-            - A tensor of losses.
-            - A tensor of predictions.
-            - A tensor of target labels.
-        """
-        x, y = batch
-        logits = self.forward(x)
-        loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        return loss, preds, y
+        text = self.decode(text)
+        
+        # Remove the <sos> and <eos> tokens
+        _text = ""
+        for i in range(len(text)):
+          if text[i] == '<eos>' or text[i] == '<sos>' or text[i] == '<pad>':
+            break
+          _text += text[i]
+
+        return _text
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set.
@@ -160,15 +148,9 @@ class HTRTransformerLitModule(LightningModule):
         labels = batch[1].permute(1, 0)
         labels[labels == 1] = -100
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
-        
-        # outputs = self.net.forward(images=batch[0], labels=labels)
         outputs = self.net(images=images, labels=labels)
-
-        print(f'Labels[:2]: {labels[:2]}')
-        print(f'outputs[:2]: {outputs.logits[:2].argmax(-1)}')
-
 
         logits = outputs.logits
 
@@ -178,8 +160,6 @@ class HTRTransformerLitModule(LightningModule):
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
 
-        # labels[labels == -100] = 1
-
         if batch_idx < 10:
           for i in range(images.shape[0]):
             # images_ = self.metric_logger.log_images(images[i], f'train/training_images_{self.train_datasets[0]}')
@@ -187,21 +167,8 @@ class HTRTransformerLitModule(LightningModule):
             _label = labels[i].detach().cpu().numpy().tolist()
             _label = [label if label != -100 else 1 for label in _label]
             _pred = logits[i].argmax(-1).detach().cpu().numpy().tolist()
-            _label, _pred = self.decode(_label), self.decode(_pred)
-            _label_, _pred_ = "", ""
-            for l in range(len(_label)):
-              if _label[l] == '<eos>' or _label[l] == '<sos>' or _label[l] == '<pad>':
-                break
-              _label_ += _label[l]
-
-            for l in range(len(_pred)):
-              if _pred[l] == '<eos>' or _pred[l] == '<sos>' or _pred[l] == '<pad>':
-                break
-              _pred_ += _pred[l]
-              
-            _label, _pred = _label_, _pred_
+            _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
             print(f'Label: {_label}. Pred: {_pred}')
-            # self.metric_logger.log_train_step_cer(_pred, _label, self.train_datasets[0])
             cer = CER()(_pred, _label)
             self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
@@ -214,6 +181,7 @@ class HTRTransformerLitModule(LightningModule):
         "Lightning hook that is called when a training epoch ends."
         self.metric_logger.log_train_metrics()
         self.metric_logger.update_epoch(self.current_epoch)
+        self.metric_logger_minusc.update_epoch(self.current_epoch)
 
         pass
 
@@ -235,15 +203,15 @@ class HTRTransformerLitModule(LightningModule):
         print(f'images.shape: {images.shape}')
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
-        
+        total_cer_per_batch = 0.0
 
         if self.current_epoch == 0 and self.global_step <= 1:
           str_train_datasets = f'val_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
         
-        preds = self.net.predict_greedy(images)
+        preds = self.net.predict_greedy(images).sequences
+        preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
         # print(f'preds[:10]: {preds.sequences[:10]}')
         print(f'preds[:10]: {preds[:10]}')
 
@@ -254,53 +222,46 @@ class HTRTransformerLitModule(LightningModule):
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()
 
-          _label, _pred = self.decode(_label), self.decode(_pred)
-
-          _label_, _pred_ = "", ""
-          for l in range(len(_label)):
-            if _label[l] == '<eos>' or _label[l] == '<pad>':
-              break
-            _label_ += _label[l]
-
-          for l in range(len(_pred)):
-            if _pred[l] == '<eos>' or _pred[l] == '<pad>':
-              break
-            _pred_ += _pred[l]
-
-          # Remove <sos> token from pred
-          _pred = _pred_.replace('<sos>', '')
-            
-          _label, _pred = _label_, _pred_
+          _label = [label if label != -100 else 1 for label in _label]
+          _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
+          self.metric_logger.log_val_step_wer(_pred, _label, dataset)
+          _pred_minus = _pred.lower()
+          _label_minus = _label.lower()
+
+          self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
+          self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
+
+          print(f'VAL Label: {_label}. Pred: {_pred}')
+          cer = CER()(_pred, _label)
           
           if batch_idx < 20:
-            # print(f'Label: {_label}. Pred: {_pred}')
-            print(f'VAL Label: {_label}. Pred: {_pred}')
-            cer = CER()(_pred, _label)
             self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
 
-        self.metric_logger.log_val_step_cer(preds_str, labels_str, dataset)
+          total_cer_per_batch += cer
+        
+        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
-        # Calculate CER
-        self.val_cer[dataset](preds_str, labels_str)
-        # self.log(f"val/cer_{dataset}", step_cer, on_step=True, on_epoch=True, prog_bar=True)
 
-        # update and log metrics
-        # self.val_loss(loss)
-        # self.val_acc(preds, targets)
-        # self.log("val/cer", step_cer, on_step=True, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
-        # log.info(f'Calculating validation CER for each dataset')
 
-        # mean_val_cer /= len(self.val_datasets)
-        mean_val_cer, mean_val_wer = self.metric_logger.log_val_metrics()
-
-        self.log(f'val/cer_epoch', mean_val_cer, sync_dist=False, prog_bar=True)
-        self.log(f'val/wer_epoch', mean_val_wer, sync_dist=False, prog_bar=True)
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_val_metrics()
+        print(f'mean_val_cer: {mean_val_cer}')
+        self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
+        self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        
+        # Log CER minusc
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_val_metrics()
+        self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
+        self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
 
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int) -> None:
@@ -314,37 +275,56 @@ class HTRTransformerLitModule(LightningModule):
         dataset = self.test_datasets[dataloader_idx]
         # print(f'Calculating test CER for each dataset for dataloader_idx: {dataloader_idx}. Dataset: {dataset}')
 
-        y = batch[1].permute(1, 0)
-        # y[y == 1] = -100
-        labels = y[:, 1:].clone().contiguous() # Shift all labels to the right
+        # Get epoch
+        epoch = self.current_epoch
+
+        images, labels = batch[0], batch[1]
+        print(f'images.shape: {images.shape}')
+        labels = labels.permute(1, 0)
+        labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
+        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+
+        total_cer_per_batch = 0.0
+
+        if self.current_epoch == 0 and self.global_step <= 1:
+          str_train_datasets = f'test_' + ', '.join(self.train_datasets)
+          self.metric_logger.log_images(images, str_train_datasets)
         
-        # loss, preds, targets = self.model_step(batch)
-        preds = self.net.predict_greedy(batch[0])
+        preds = self.net.predict_greedy(images)
+        # print(f'preds[:10]: {preds.sequences[:10]}')
+        print(f'preds[:10]: {preds[:10]}')
 
         preds_str, labels_str = [], []
-        # Decode using self.decode
-        for i in range(preds.sequences.shape[0]):
-          # Convert preds and labels to list of strings to call decode removing special tokens
-          _pred_str = self.decode(preds.sequences[i].tolist())
-          _label_str = self.decode(labels[i].tolist())
-          # Remove special tokens for each string and join the list to get a string
-          _pred_str = ''.join([char.replace('<eos>', '').replace('<sos>', '').replace('<pad>', '') for char in _pred_str])
-          _label_str = ''.join([char.replace('<eos>', '').replace('<sos>', '').replace('<pad>', '') for char in _label_str])
-          preds_str.append(_pred_str)
-          labels_str.append(_label_str)
+        for i in range(images.shape[0]):
+          images_ = self.metric_logger.log_images(images[i], f'test/test_images_{dataset}')
+          _label = labels[i].detach().cpu().numpy().tolist()
+          # _pred = preds.sequences[i].tolist()
+          _pred = preds[i].tolist()
+
+          _label = [label if label != -100 else 1 for label in _label]
+          _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
           
-        print(f'preds_str (test): {preds_str[:10]}')
-        print(f'labels_str (test): {labels_str[:10]}')
+          self.metric_logger.log_test_step_cer(_pred, _label, dataset)
+          self.metric_logger.log_test_step_wer(_pred, _label, dataset)
+          
+          if batch_idx < 20:
+            self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
-        self.metric_logger.log_test_step_cer(preds_str, labels_str, dataset)
+          print(f'TEST Label: {_label}. Pred: {_pred}')
+          cer = CER()(_pred, _label)
 
-        # Calculate CER
-        step_cer = self.test_cer[dataset](preds_str, labels_str)
-        # self.log(f"test/cer_{dataset}", step_cer, on_step=True, on_epoch=True, prog_bar=True)
+          total_cer_per_batch += cer
+        
+        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
     def on_test_epoch_end(self) -> None:
-        """Lightning hook that is called when a test epoch ends."""
-        self.metric_logger.log_test_metrics()
+        test_cer, test_wer = self.metric_logger.log_test_metrics()
+        print(f'test_cer: {test_cer}')
+        print(f'test_wer: {test_wer}')
+
+        test_cer_minus, test_wer_minus = self.metric_logger_minusc.log_test_metrics()
+        print(f'test_cer_minus: {test_cer_minus}')
+        print(f'test_wer_minus: {test_wer_minus}')
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
