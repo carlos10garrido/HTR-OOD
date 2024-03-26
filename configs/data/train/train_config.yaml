@@ -6,6 +6,7 @@ train_config:
   _target_: src.data.data_config.DataConfig
   stage: train
   img_size: [64,256]
+  binarize: True
   batch_size: 128
   num_workers: 8
   pin_memory: False
