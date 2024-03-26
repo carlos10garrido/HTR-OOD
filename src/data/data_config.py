@@ -31,6 +31,7 @@ class DataConfig:
   _target_: str = field(default='src.data.data_config.DataConfig')
   stage: str = field(default='train')
   img_size: tuple = field(default=(64, 256))
+  binarize: bool = field(default=True)
   batch_size: int = field(default=64)
   num_workers: int = field(default=4)
   pin_memory: bool = field(default=True)
