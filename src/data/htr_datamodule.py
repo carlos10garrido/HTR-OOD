@@ -3,7 +3,7 @@ import os
 import numpy as np
 import torch
 import pytorch_lightning as pl
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, RandomSampler
 import xml.etree.ElementTree as ET
@@ -18,12 +18,12 @@ from omegaconf import DictConfig, OmegaConf
 from typing import Any, Dict, List, Optional, Tuple
 from lightning import LightningDataModule
 
+# Import opencv for binarization
+import cv2
+
 import torchvision
 import sklearn
 from sklearn.cluster import KMeans
-
-# Seed everything with Pytorch Lightning
-
 
 
 # Import data_config
@@ -40,8 +40,6 @@ from src.data.data_utils import (
     has_glyph,
     generate_image,
     read_htr_fonts,
-    # read_data_real,
-    # read_data_synth
     prepare_esposalles,
     prepare_saint_gall,
 )
@@ -161,28 +159,15 @@ class HTRDatasetSynth(Dataset):
                 
         return image, sequence
 
-# class HTRDataset(Dataset):
-#     def __init__(self, paths_images, words, transform=None):
-#         self.paths_images = paths_images
-#         self.words = words
-#         self.transform = transform
-
-#     def __len__(self):
-#         return len(self.paths_images)
-
-#     def __getitem__(self, idx):
-#         sequece = self.words[idx]
-#         image = Image.open(self.paths_images[idx])
-#         if self.transform:
-#             image = self.transform(image)
-        
-#         return image, sequece
 
 class HTRDataset(Dataset):
-    def __init__(self, paths_images, words, transform=None):
+    def __init__(self, paths_images, words, binarize=True, transform=None):
         self.paths_images = paths_images
         self.words = words
         self.transform = transform
+        self.binarize = binarize
+
+
 
     def __len__(self):
         return len(self.paths_images)
@@ -213,18 +198,24 @@ class HTRDataset(Dataset):
 
     def __getitem__(self, idx):
         sequece = self.words[idx]
-        image = Image.open(self.paths_images[idx])
+
+        if self.binarize:
+          # Read image with opencv
+          image = cv2.imread(self.paths_images[idx])
+          # Convert to grayscale if image is not grayscale
+          if len(image.shape) == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+          # Binarize image with opencv Otsu algorithm
+          _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+          # Convert to PIL image
+          image = Image.fromarray(image)
+        else:
+          image = Image.open(self.paths_images[idx])
+
         if self.transform:
             image = self.transform(image)
-
-        channels = image.shape[0]
-
-        image = torchvision.transforms.functional.adjust_contrast(image, 1.5)
-        image = self.binarize_image(image, channels=channels)
-
-        # Convert to tensor
-        image = torch.tensor(image, dtype=torch.float32)
-        
+  
         return image, sequece
 
 
@@ -341,9 +332,11 @@ class HTRDataModule(pl.LightningDataModule):
                   with open(ds.splits_path, "r") as f:
                       setfiles = f.read().splitlines()
                   images_paths, words = read_data(ds.images_path, ds.labels_path, setfiles)
-                  htr_dataset = HTRDataset(images_paths, words, transform=configs[_stage].transforms[0])
+                  print(f'Binarize: {configs[_stage].binarize}')
+                  breakpoint()
+                  htr_dataset = HTRDataset(images_paths, words, binarize=configs[_stage].binarize, transform=configs[_stage].transforms[0])
 
-              elif isinstance(ds, SynthDatasetConfig): # Synthetic dataset
+              elif isinstance(ds, SynthDatasetConfig): # Synthetic dataset TODO because is per-line not per-word
                   # Read words from json file
                   with open(ds.words_path, "r") as f:
                       words = json.load(f)
