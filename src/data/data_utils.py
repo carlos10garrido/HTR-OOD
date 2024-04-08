@@ -89,11 +89,11 @@ def has_glyph(font, glyph):
             return True
     return False
 
-def generate_image(word, font):
-    txt = word
+def generate_image(sequence, font, background_color=(255, 255, 255), text_color=(0, 0, 0)):
+    txt = sequence
     font_name = font
     font = ImageFont.truetype(font, 50)
-    img_size = (1500//2, 1000//2)
+    img_size = (1500, 1000)
 
     # Check if a font can generate all the characters
     for char in txt:
@@ -102,9 +102,9 @@ def generate_image(word, font):
 
 
     # Generate white image
-    img = Image.new("RGB", (img_size[0], img_size[1]), (255, 255, 255))
+    img = Image.new("RGB", (img_size[0], img_size[1]), background_color)
     draw = ImageDraw.Draw(img)
-    draw.text((img_size[1]//10, img_size[0]//4), txt, font=font, fill=(0, 0, 0))
+    draw.text((img_size[1]//10, img_size[0]//4), txt, font=font, fill=text_color)
 
     # Apply transformations here? (before cropping)
 
@@ -127,7 +127,7 @@ def generate_image(word, font):
     img = cropped_image
 
     # Check if image shapes are zero
-    assert img.size[0] != 0 and img.size[1] != 0, f'Image shape is zero. Image shape: {img.size}. Word: {word}'
+    assert img.size[0] != 0 and img.size[1] != 0, f'Image shape is zero. Image shape: {img.size}. Sequence: {sequence}'
 
     return img
 
