@@ -1,0 +1,5 @@
+# https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html
+
+model_checkpoint_base:
+  dirpath: ${paths.checkpoints_dir} # directory to save the model file
+  filename: null # checkpoint filename

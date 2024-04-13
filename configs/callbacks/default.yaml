@@ -1,8 +1,8 @@
 defaults:
   - _self_
-  # - model_checkpoint
+  - model_checkpoint_base
   - model_checkpoint_id
-  - model_checkpoint_heldout
+  - heldout_checkpoints
   - early_stopping
   - model_summary
   # - rich_progress_bar

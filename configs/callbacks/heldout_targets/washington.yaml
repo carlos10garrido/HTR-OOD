@@ -1,10 +1,10 @@
 # https://lightning.ai/docs/pytorch/stable/api/lightning.pytorch.callbacks.ModelCheckpoint.html
 
-model_checkpoint_heldout:
+model_checkpoint_target_washington:
   _target_: lightning.pytorch.callbacks.ModelCheckpoint
   dirpath: ${paths.checkpoints_dir} # directory to save the model file
-  filename: null # checkpoint filename
-  monitor: "val/heldout_domain_cer" # name of the logged metric which determines when model is improving
+  filename: ${callbacks.model_checkpoint_base.filename}_tgt_washington # Will be added appending a name in the terminal
+  monitor: "val/heldout_target_washington" # name of the logged metric which determines when model is improving
   verbose: True # verbosity mode
   save_last: null # additionally always save an exact copy of the last checkpoint to a file last.ckpt
   save_top_k: 1 # save k best models (determined by above metric)
