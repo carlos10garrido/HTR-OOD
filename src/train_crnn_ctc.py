@@ -101,7 +101,18 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     # ckpt_path = cfg.callbacks.model_checkpoint.filename if cfg.callbacks.model_checkpoint.filename else None
 
     # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    ckpt_path = cfg.callbacks.model_checkpoint.dirpath + cfg.callbacks.model_checkpoint.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    # ckpt_path = cfg.callbacks.model_checkpoint.dirpath + cfg.callbacks.model_checkpoint.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    # # if ckpt_path exists, load the model from the checkpoint
+    # if ckpt_path is not None and os.path.exists(ckpt_path):
+    #     print(f'CHECKPOINT PATH EXISTS: {ckpt_path}')
+    #     print(f'MODEL WILL BE LOADED FROM CHECKPOINT: {model}')
+    # else:
+    #     print(f'CHECKPOINT PATH DOES NOT EXIST: {ckpt_path}')
+    #     print(f'MODEL WILL BE TRAINED FROM SCRATCH: {model}')
+    #     ckpt_path = None
+
+    # Load a checkpoint if provided from callbacks.model_checkpoint filename
+    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
     # if ckpt_path exists, load the model from the checkpoint
     if ckpt_path is not None and os.path.exists(ckpt_path):
         print(f'CHECKPOINT PATH EXISTS: {ckpt_path}')

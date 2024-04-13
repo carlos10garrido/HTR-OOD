@@ -101,7 +101,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     # ckpt_path = cfg.callbacks.model_checkpoint.filename if cfg.callbacks.model_checkpoint.filename else None
 
     # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    ckpt_path = cfg.callbacks.model_checkpoint.dirpath + cfg.callbacks.model_checkpoint.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
     # if ckpt_path exists, load the model from the checkpoint
     if ckpt_path is not None and os.path.exists(ckpt_path):
         print(f'CHECKPOINT PATH EXISTS: {ckpt_path}')
@@ -114,7 +114,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
 
     model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
     # Train the model
-    trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader(), ckpt_path=ckpt_path)
+    trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
     
 
     # Predict iterating over images
@@ -122,99 +122,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     results = trainer.test(model, datamodule.test_dataloader())
     print(f'PREDICTIONS: {results}')
 
-    # # Add Early Stopping callback
-    # early_stop_callback = EarlyStopping(
-    #     monitor='val_cer_epoch',
-    #     min_delta=0.01,
-    #     patience=patience,
-    #     verbose=True,
-    #     mode='min'
-    # )
-
-    # model_checkpoint_callback = ModelCheckpoint(
-    #     monitor='val_cer_epoch',
-    #     dirpath='checkpoints/',
-    #     filename=run_name + '-{epoch:02d}-{val_cer_epoch:.2f}',
-    #     save_top_k=1,
-    #     mode='min',
-    #     verbose=True,
-    # )
-  
-    # # Create a Trainer
-    # trainer = pl.Trainer(
-    #     # overfit_batches=1,
-    #     max_epochs=epochs,
-    #     logger=wandb_logger,
-    #     deterministic=True,
-    #     num_sanity_val_steps=1,
-    #     callbacks=[early_stop_callback, model_checkpoint_callback],
-    #     # overfit_batches=5
-    # )
-
-    # # # Compile the model
-    # model = model #torch.compile(model, mode="max-autotune")
-
-    # # Train the model with concatenated datamodules
-    # datasets_train = []    
-    # for dataset in train_datasets:
-    #     dm = datamodules[dataset]
-    #     print(f'Loading {dataset} dataset... for training')
-    #     datasets_train.append(dm.train_dataset)
-
-    # concat_dataset = torch.utils.data.ConcatDataset(datasets_train)
-
-    # if len(train_datasets) > 1:
-    #     # Calculate Weighted Random Sampler for each sample in ConcatDataset. 
-    #     # Each sample has a weight equal to the number of samples in the dataset it belongs to.
-    #     # This is done to balance the training of the model on different datasets.
-    #     weights = []
-    #     for dataset in train_datasets:
-    #         dm = datamodules[dataset]
-    #         weights += [len(dm.train_dataset)] * len(dm.train_dataset)
-    #     weights = torch.DoubleTensor(weights)
-    #     weights = 1. / weights # Invert weights to get the probability of each sample 
-    #     sampler = torch.utils.data.WeightedRandomSampler(weights, len(concat_dataset), replacement=True)
-    #     train_dl = torch.utils.data.DataLoader(
-    #       concat_dataset,
-    #       batch_size=batch_size,
-    #       sampler=sampler,
-    #       num_workers=6,
-    #       pin_memory=True,
-    #       collate_fn=lambda batch: collate_fn(batch, img_size=(img_height,img_width))
-    #     )    
-    # else:
-    #     # get dataloader directly from class instance
-    #     train_dl = datamodules[train_datasets[0]].train_dataloader()
-
-
-    # # Validate the model on validation set
-
-    # val_dls = []
-    # for dataset in val_datasets:
-    #     print(f'Loading {dataset} dataset... for validation')
-    #     dm = datamodules[dataset]
-    #     val_dls.append(dm.val_dataloader())
-        
-    # # Train the model on train set
-    # trainer.fit(model, train_dl, val_dls)
     
-    # print(f'TRAINING FINISHED')
-
-    # test_dls = []
-    # for dataset in test_datasets:
-    #     print(f'Loading {dataset} dataset... for test')
-    #     dm = datamodules[dataset]
-    #     test_dls.append(dm.test_dataloader())
-
-    # # # Evaluate the best model on test set
-    # results = trainer.test(ckpt_path='best', dataloaders=test_dls)
-
-    # print(f'TESTING FINISHED')
-    # print(f'FINAL RESULTS: {results}')
-
-    # # Close Wandb logger
-    # wandb_logger.experiment.finish()
-
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train_htr.yaml")
 def main(cfg: DictConfig) -> Optional[float]:
