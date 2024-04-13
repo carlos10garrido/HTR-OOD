@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from torch.nn.utils.rnn import pad_sequence
 from typing import Iterable, List
 from fontTools.ttLib import TTFont
+import cv2
 
 from unidecode import unidecode
 
@@ -43,7 +44,7 @@ def tensor_transform(token_ids: List[int]):
 def read_htr_fonts(fonts_path):
   fonts = []
   for font in os.listdir(fonts_path):
-      fonts.append(fonts_path + font)
+    fonts.append(fonts_path + font)
   return fonts
     
 def collate_fn(batch, img_size, text_transform):
@@ -55,24 +56,24 @@ def collate_fn(batch, img_size, text_transform):
     max_width = img_size[1] # Get max width ratio
 
     for i, (image_sample, seq_sample) in enumerate(batch):
-        if i == 0:
-            images_batch = torch.ones(len(batch), 3, img_size[0], max_width) # Reescaled height and width and white background
-        
-        # Resize image to fixed height
-        height, width = img_size[0], all_width_reescaled[i].int()
+      if i == 0:
+        images_batch = torch.ones(len(batch), 3, img_size[0], max_width) # Reescaled height and width and white background
+      
+      # Resize image to fixed height
+      height, width = img_size[0], all_width_reescaled[i].int()
 
-        if all_width_reescaled[i] > max_width:
-            width = max_width
-        image_resized_height = torchvision.transforms.Resize((height, width), antialias=True)(image_sample)
-        images_batch[i, :, :, :image_resized_height.shape[2]] = image_resized_height 
+      if all_width_reescaled[i] > max_width:
+        width = max_width
 
-        # Calculate padding
-        padding_added = max_width - image_resized_height.shape[2]
-        padded_columns.append(padding_added)
+      image_resized_height = torchvision.transforms.Resize((height, width), antialias=True)(image_sample)
+      images_batch[i, :, :, :image_resized_height.shape[2]] = image_resized_height 
 
-        # print(f'Seq sample: {seq_sample}')
+      # Calculate padding
+      padding_added = max_width - image_resized_height.shape[2]
+      padded_columns.append(padding_added)
 
-        sequences_batch.append(text_transform(seq_sample))
+      # print(f'Seq sample: {seq_sample}')
+      sequences_batch.append(text_transform(seq_sample))
 
     sequences_batch = pad_sequence(sequences_batch, padding_value=PAD_IDX)
     padded_columns = torch.tensor(padded_columns)
@@ -171,22 +172,20 @@ def read_data_rimes(images_path, lines_path, files):
     
   return images_paths, lines
 
-
 def read_data_bentham(images_path, lines_path, files):
-    images_paths, lines = [], []
+  images_paths, lines = [], []
 
-    for file in files:
-        image_path = images_path + file + ".png"
-        line_path = lines_path + file + ".txt"
+  for file in files:
+    image_path = images_path + file + ".png"
+    line_path = lines_path + file + ".txt"
 
-        # Read lines from .txt files
-        with open(line_path, "r") as f:
-          line = f.read().replace("\n", "")
-          lines.append(line)
-          images_paths.append(image_path)
+    # Read lines from .txt files
+    with open(line_path, "r") as f:
+      line = f.read().replace("\n", "")
+      lines.append(line)
+      images_paths.append(image_path)
 
-    return images_paths, lines
-
+  return images_paths, lines
 
 def convert_text_washington(text):
     text = text.replace("-", "").replace("|", " ")
@@ -199,56 +198,55 @@ def convert_text_washington(text):
     return text
 
 def read_data_washington(images_path, lines_paths, files):
-    images_paths, lines = [], []
+  images_paths, lines = [], []
 
-    # Convert files list to a set
-    files = set(files)
+  # Convert files list to a set
+  files = set(files)
 
-    # Read words from word_labels.txt
-    with open(lines_paths + "transcription.txt", "r") as f:
-      for line in f:
-        image_id, text = line.split(" ")
+  # Read words from word_labels.txt
+  with open(lines_paths + "transcription.txt", "r") as f:
+    for line in f:
+      image_id, text = line.split(" ")
 
-        # Remove \n if exists in the text
-        text = text.replace("\n", "")
-        file = image_id 
-        # file = "-".join(image_id_split[:2])
+      # Remove \n if exists in the text
+      text = text.replace("\n", "")
+      file = image_id 
+      # file = "-".join(image_id_split[:2])
 
-        # Check if first_part is in files
-        if file in files:
-          image_path = images_path + image_id + ".png"
-          text = convert_text_washington(text)
+      # Check if first_part is in files
+      if file in files:
+        image_path = images_path + image_id + ".png"
+        text = convert_text_washington(text)
 
-          # Check if image_path exists
-          if os.path.exists(image_path):
-              images_paths.append(image_path)
-              lines.append(text)
+        # Check if image_path exists
+        if os.path.exists(image_path):
+            images_paths.append(image_path)
+            lines.append(text)
 
-    return images_paths, lines
-
+  return images_paths, lines
 
 def read_data_saint_gall(images_path, lines_paths, files):
-    images_paths, lines = [], []
+  images_paths, lines = [], []
 
-    # Convert files list to a set
-    files = set(files)
+  # Convert files list to a set
+  files = set(files)
 
-    # Read words from transcriptions.txt
-    with open(lines_paths + "transcription.txt", "r") as f:
-      for line in f:
-        image_id, text = line.split(" ")[0], line.split(" ")[1]
-        file = '-'.join(image_id.split('-')[:2]) # Get first two parts of the image_id that corresponds to a line
-        image_path = images_path + image_id + ".png"
-        text = text.replace("\n", "")
-        text = text.replace("-", "").replace("|", " ")
-        text = text.replace("s_pt", ".").replace("s_cm", ",")
+  # Read words from transcriptions.txt
+  with open(lines_paths + "transcription.txt", "r") as f:
+    for line in f:
+      image_id, text = line.split(" ")[0], line.split(" ")[1]
+      file = '-'.join(image_id.split('-')[:2]) # Get first two parts of the image_id that corresponds to a line
+      image_path = images_path + image_id + ".png"
+      text = text.replace("\n", "")
+      text = text.replace("-", "").replace("|", " ")
+      text = text.replace("s_pt", ".").replace("s_cm", ",")
 
-        # Check if folder is in files 
-        if file in files:
-          images_paths.append(image_path)
-          lines.append(text)
+      # Check if folder is in files 
+      if file in files:
+        images_paths.append(image_path)
+        lines.append(text)
 
-    return images_paths, lines
+  return images_paths, lines
 
 def read_data_rodrigo(images_path, lines_paths, files):
     images_paths, lines = [], []
@@ -272,191 +270,230 @@ def read_data_rodrigo(images_path, lines_paths, files):
 
           # Check if image_path exists
           if os.path.exists(image_path):
-              images_paths.append(image_path)
-              lines.append(text)
+            images_paths.append(image_path)
+            lines.append(text)
 
     return images_paths, lines
 
 def read_data_icfhr_2016(images_path, lines_paths, files):
-    images_paths, lines = [], []
+  images_paths, lines = [], []
 
-    print(f'Files {files}')
+  print(f'Files {files}')
 
-    # Convert files list to a set
-    files = set(files)
+  # Convert files list to a set
+  files = set(files)
 
-    # Read words from word_labels.txt
-    with open(lines_paths + "transcriptions.txt", "r") as f:
-      for line in f:
-        image_id, text = line.split(" ", 1)
-        # print(f'Image id-{image_id}.Text-{text}')
+  # Read words from word_labels.txt
+  with open(lines_paths + "transcriptions.txt", "r") as f:
+    for line in f:
+      image_id, text = line.split(" ", 1)
+      # print(f'Image id-{image_id}.Text-{text}')
 
-        # Remove \n if exists in the text
-        text = text.replace("\n", "")
-        file = image_id 
-        # file = "-".join(image_id_split[:2])
+      # Remove \n if exists in the text
+      text = text.replace("\n", "")
+      file = image_id 
+      # file = "-".join(image_id_split[:2])
 
-        # Check if first_part is in files
-        if file.split("_")[0] in files:
-          image_path = images_path + image_id + ".png"
+      # Check if first_part is in files
+      if file.split("_")[0] in files:
+        image_path = images_path + image_id + ".png"
 
-          # Check if image_path exists
-          if os.path.exists(image_path):
-              images_paths.append(image_path)
-              lines.append(text)
+        # Check if image_path exists
+        if os.path.exists(image_path):
+            images_paths.append(image_path)
+            lines.append(text)
 
-    return images_paths, lines
-
+  return images_paths, lines
 
 def read_data_esposalles(images_path, words_path, files):
-    images_paths, words = [], []
-    # print(f'Files {files}')
-    for file in files:
-        folder_path = words_path + file
-        record_path = folder_path + '/words/'
+  images_paths, words = [], []
+  # print(f'Files {files}')
+  for file in files:
+    folder_path = words_path + file
+    record_path = folder_path + '/words/'
 
-        transcription_path = record_path + file.split('/')[-1] + '_' + 'transcription.txt'
+    transcription_path = record_path + file.split('/')[-1] + '_' + 'transcription.txt'
+    stage = "train"
 
-        stage = "train"
+    if "test" in file:
+      stage = "test"
+      csv_path = words_path + file.split("/")[-2] + '/gt/' + file.split("/")[-1] + '_output.csv'
+      transcription_path = csv_path
 
-        if "test" in file:
-            stage = "test"
-            csv_path = words_path + file.split("/")[-2] + '/gt/' + file.split("/")[-1] + '_output.csv'
-            transcription_path = csv_path
+    # Read words/transcription.txt
+    with open(transcription_path, 'r') as f:
+      for line in f:
+        if stage == "test":
+          folder, word = line.split(",")[0], line.split(",")[1]
+        else:
+          folder, word = line.split(":")[0], line.split(":")[1]
 
-        # Read words/transcription.txt
+        image_path = record_path + folder + '.png'
+        word = word.replace("\n", "")
 
-        with open(transcription_path, 'r') as f:
-            for line in f:
-                if stage == "test":
-                    folder, word = line.split(",")[0], line.split(",")[1]
-                else:
-                    folder, word = line.split(":")[0], line.split(":")[1]
-                image_path = record_path + folder + '.png'
-                word = word.replace("\n", "")
-
-                # Check if folder is in files
-                if os.path.exists(image_path):
-                    images_paths.append(image_path)
-                    words.append(word)
+        # Check if folder is in files
+        if os.path.exists(image_path):
+            images_paths.append(image_path)
+            words.append(word)
 
 
-    return images_paths, words
+  return images_paths, words
 
 def read_data_parzival(images_path, words_path, files):
-    images_paths, words = [], []
+  images_paths, words = [], []
 
-    # Convert files list to a set
-    files = set(files)
-    print(f'Files {files}')
+  # Convert files list to a set
+  files = set(files)
+  print(f'Files {files}')
 
-    # Read words from word_labels.txt
-    with open(words_path + "word_labels.txt", "r") as f:
-        for line in f:
-            image_id, text = line.split(" ")
-            image_id_split = image_id.split("-")
+  # Read words from word_labels.txt
+  with open(words_path + "word_labels.txt", "r") as f:
+    for line in f:
+      image_id, text = line.split(" ")
+      image_id_split = image_id.split("-")
 
-            # Remove \n if exists in the text
-            text = text.replace("\n", "")
-            file = "-".join(image_id_split[:2])
+      # Remove \n if exists in the text
+      text = text.replace("\n", "")
+      file = "-".join(image_id_split[:2])
 
-            # Check if first_part is in files
-            if file in files:
-                image_path = images_path + image_id + ".png"
-                text = text.replace("-", "").replace("|", " ")
-                text = text.replace("s_pt", ".").replace("s_cm", ",")
-                text = text.replace("s_mi", "-").replace("s_qo", ":")
-                text = text.replace("s_sq", ";").replace("s_et", "V")
-                text = text.replace("s_bl", "(").replace("s_br", ")")
-                text = text.replace("s_qt", "'").replace("s_GW", "G.W.")
-                text = text.replace("s_", "")
+      # Check if first_part is in files
+      if file in files:
+        image_path = images_path + image_id + ".png"
+        text = text.replace("-", "").replace("|", " ")
+        text = text.replace("s_pt", ".").replace("s_cm", ",")
+        text = text.replace("s_mi", "-").replace("s_qo", ":")
+        text = text.replace("s_sq", ";").replace("s_et", "V")
+        text = text.replace("s_bl", "(").replace("s_br", ")")
+        text = text.replace("s_qt", "'").replace("s_GW", "G.W.")
+        text = text.replace("s_", "")
 
-                # Check if image_path exists
-                if os.path.exists(image_path):
-                    images_paths.append(image_path)
-                    words.append(text)
+        # Check if image_path exists
+        if os.path.exists(image_path):
+            images_paths.append(image_path)
+            words.append(text)
 
-    return images_paths, words
+  
+  return images_paths, words
 
 def prepare_esposalles(data_dir):
   print(f'Preparing esposalles dataset')
 
   # Check if exists esposalles/splits and create it if not
   if not os.path.exists(data_dir + "/splits"):
-      print(f'Creating esposalles/splits')
-      os.makedirs(data_dir + "/splits", exist_ok=True)
+    print(f'Creating esposalles/splits')
+    os.makedirs(data_dir + "/splits", exist_ok=True)
 
-      # Put IEHHR_training_part1 + IEHHR_training_part2 folders in train.txt
-      with open(data_dir + "/splits/train.txt", "w") as f:
-          for file in os.listdir(data_dir + "/IEHHR_training_part1"):
-              f.write("/IEHHR_training_part1/" + file + "\n")
-          for file in os.listdir(data_dir + "/IEHHR_training_part2"):
-              f.write("/IEHHR_training_part2/" + file + "\n")
-      # Put IEHHR_training_part3 + IEHHR_training_part2 folders in validation.txt
-      with open(data_dir + "/splits/validation.txt", "w") as f:
-          for file in os.listdir(data_dir + "/IEHHR_training_part3"):
-              f.write("/IEHHR_training_part3/" + file + "\n")
+    # Put IEHHR_training_part1 + IEHHR_training_part2 folders in train.txt
+    with open(data_dir + "/splits/train.txt", "w") as f:
+      for file in os.listdir(data_dir + "/IEHHR_training_part1"):
+        f.write("/IEHHR_training_part1/" + file + "\n")
+      for file in os.listdir(data_dir + "/IEHHR_training_part2"):
+        f.write("/IEHHR_training_part2/" + file + "\n")
 
-      # Put IEHHR_test folders in test.txt
-      with open(data_dir + "/splits/test.txt", "w") as f:
-          for file in os.listdir(data_dir + "/IEHHR_test"):
-              f.write("/IEHHR_test/Records/" + file + "\n")
+    # Put IEHHR_training_part3 + IEHHR_training_part2 folders in validation.txt
+    with open(data_dir + "/splits/validation.txt", "w") as f:
+      for file in os.listdir(data_dir + "/IEHHR_training_part3"):
+        f.write("/IEHHR_training_part3/" + file + "\n")
+
+    # Put IEHHR_test folders in test.txt
+    with open(data_dir + "/splits/test.txt", "w") as f:
+      for file in os.listdir(data_dir + "/IEHHR_test"):
+        f.write("/IEHHR_test/Records/" + file + "\n")
   else:
-      print(f'esposalles/splits already exists')
+    print(f'esposalles/splits already exists')
 
 def prepare_saint_gall(data_dir):
-    print(f'Preparing saint_gall dataset')
+  print(f'Preparing saint_gall dataset')
 
-    # Check if exists saint_gaill/data/words_images_normalized or is empty
-    if not os.path.exists(data_dir + "/data/words_images_normalized") \
-        or len(os.listdir(data_dir + "/data/words_images_normalized")) == 0:
-        print(f'Creating saint_gall/data/words_images_normalized')
-        os.makedirs(data_dir + "/data/words_images_normalized", exist_ok=True)
+  # Check if exists saint_gaill/data/words_images_normalized or is empty
+  if not os.path.exists(data_dir + "/data/words_images_normalized") \
+    or len(os.listdir(data_dir + "/data/words_images_normalized")) == 0:
+    print(f'Creating saint_gall/data/words_images_normalized')
+    os.makedirs(data_dir + "/data/words_images_normalized", exist_ok=True)
 
-        # Read words_location.txt and for each image crop it and save it in saint_gaill/data/words_images_normalized
-        with open(data_dir + "/ground_truth/word_location.txt", "r") as f:
-            for line in f:
-                image_path, _, locations = line.split(" ")
-                image_path_full = data_dir + '/data/line_images_normalized/' + image_path + ".png"
-                image = Image.open(image_path_full)
+    # Read words_location.txt and for each image crop it and save it in saint_gaill/data/words_images_normalized
+    with open(data_dir + "/ground_truth/word_location.txt", "r") as f:
+      for line in f:
+        image_path, _, locations = line.split(" ")
+        image_path_full = data_dir + '/data/line_images_normalized/' + image_path + ".png"
+        image = Image.open(image_path_full)
 
-                # Crop all locations images
-                for idx, location in enumerate(locations.split("|")):
-                    x0, x1 = int(location.split("-")[0]), int(location.split("-")[1])
+        # Crop all locations images
+        for idx, location in enumerate(locations.split("|")):
+            x0, x1 = int(location.split("-")[0]), int(location.split("-")[1])
 
-                    # Crop image
-                    cropped_image = image.crop((x0, 0, x1, image.size[1]))
+            # Crop image
+            cropped_image = image.crop((x0, 0, x1, image.size[1]))
 
-                    # Save image in words_images_normalized
-                    cropped_image_path = data_dir + "/data/words_images_normalized/" + image_path + "-" + str(idx) + ".png"
-                    print(f'Saving image in {cropped_image_path}')
-                    cropped_image.save(cropped_image_path)
+            # Save image in words_images_normalized
+            cropped_image_path = data_dir + "/data/words_images_normalized/" + image_path + "-" + str(idx) + ".png"
+            print(f'Saving image in {cropped_image_path}')
+            cropped_image.save(cropped_image_path)
 
-        print(f'Parsed images from lines')
+    print(f'Parsed images from lines')
 
-    else:
-        print(f'Images from lines already parsed')   
+  else:
+    print(f'Images from lines already parsed')   
 
     # Set splits from random_split if not exists in splits folder
     random_list_path = splits_path + "random_list.txt"
 
     if os.path.exists(random_list_path):
-        print(f'Random list already exists')
+      print(f'Random list already exists')
 
-        # Divide random_list.txt in train, validation and test and rewrite
-        with open(random_list_path, "r") as f:
-            random_list = f.read().splitlines()
+      # Divide random_list.txt in train, validation and test and rewrite
+      with open(random_list_path, "r") as f:
+          random_list = f.read().splitlines()
 
-            # Divide random_list in train, validation and test [0.6, 0.2, 0.2] and rewrite
-            n_train = int(len(random_list) * 0.6)
-            n_val = int(len(random_list) * 0.2)
+          # Divide random_list in train, validation and test [0.6, 0.2, 0.2] and rewrite
+          n_train = int(len(random_list) * 0.6)
+          n_val = int(len(random_list) * 0.2)
 
-            # Write lines in train.txt, val.txt and test.txt
-            with open(splits_path + "train.txt", "w") as f:
-                f.write("\n".join(random_list[:n_train]))
-            with open(splits_path + "validation.txt", "w") as f:
-                f.write("\n".join(random_list[n_train:n_train+n_val]))
-            with open(splits_path + "test.txt", "w") as f:
-                f.write("\n".join(random_list[n_train+n_val:]))
+          # Write lines in train.txt, val.txt and test.txt
+          with open(splits_path + "train.txt", "w") as f:
+              f.write("\n".join(random_list[:n_train]))
+          with open(splits_path + "validation.txt", "w") as f:
+              f.write("\n".join(random_list[n_train:n_train+n_val]))
+          with open(splits_path + "test.txt", "w") as f:
+              f.write("\n".join(random_list[n_train+n_val:]))
     else:
         raise Exception(f'Random list not exists in {random_list_path}!')
+
+
+# Dilation class for transform using opencv
+class Dilation(object):
+  def __init__(self, kernel_size=3, iterations=1):
+    self.kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    self.iterations = iterations
+
+  def __call__(self, image):
+    # First invert the image
+    image = cv2.bitwise_not(np.array(image))
+    image = cv2.dilate(image, self.kernel, iterations=self.iterations)
+    return cv2.bitwise_not(image)
+    # return cv2.dilate(np.array(image), self.kernel, iterations=self.iterations)
+
+# Erosion class for transform using opencv
+class Erosion(object):
+  def __init__(self, kernel_size=3, iterations=1):
+    self.kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    self.iterations = iterations
+
+  def __call__(self, image):
+    # First invert the image
+    image = cv2.bitwise_not(np.array(image))
+    image = cv2.erode(image, self.kernel, iterations=self.iterations)
+    return cv2.bitwise_not(image)
+    # return cv2.erode(np.array(image), self.kernel, iterations=self.iterations)
+
+class Binarization(object):
+  def __init__(self):
+    pass
+
+  def __call__(self, image):
+    if len(image.shape) == 3:
+      image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+      # Binarize image with opencv Otsu algorithm
+    _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    return image
