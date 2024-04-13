@@ -2,5 +2,5 @@ random:
   _target_: src.data.data_config.RandomSynthDatasetConfig
   name: random
   fonts_path: ${paths.data_dir}/synth/handwritten-fonts/
-  max_len: 20
+  max_len: 50
   words_to_generate: 10000
