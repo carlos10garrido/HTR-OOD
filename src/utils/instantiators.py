@@ -69,6 +69,28 @@ def instantiate_data_configs(data_cfg: DictConfig) -> dict:
 
     return data_configs
 
+def instantiate_sub_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
+    """Instantiates sub callbacks from config.
+
+    :param callbacks_cfg: A DictConfig object containing callback configurations.
+    :return: A list of instantiated callbacks.
+    """
+    callbacks: List[Callback] = []
+
+    if not callbacks_cfg:
+        log.warning("No callback configs found! Skipping..")
+        return callbacks
+
+    if not isinstance(callbacks_cfg, DictConfig):
+        raise TypeError("Callbacks config must be a DictConfig!")
+
+    for _, cb_conf in callbacks_cfg.items():
+        if isinstance(cb_conf, DictConfig) and "_target_" in cb_conf:
+            log.info(f"Instantiating subcallback <{cb_conf._target_}>")
+            callbacks.append(hydra.utils.instantiate(cb_conf))
+
+    return callbacks
+
 
 def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
     """Instantiates callbacks from config.
@@ -89,6 +111,10 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
         if isinstance(cb_conf, DictConfig) and "_target_" in cb_conf:
             log.info(f"Instantiating callback <{cb_conf._target_}>")
             callbacks.append(hydra.utils.instantiate(cb_conf))
+
+    # Instantiate sub callbacks.heldout_targets callbacks
+    if "heldout_targets" in callbacks_cfg:
+        callbacks.extend(instantiate_sub_callbacks(callbacks_cfg.heldout_targets))
 
     return callbacks
 
