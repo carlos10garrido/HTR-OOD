@@ -17,6 +17,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from typing import Any, Dict, List, Optional, Tuple
 from lightning import LightningDataModule
+from datasets import load_dataset
 
 # Import opencv for binarization
 import cv2
@@ -24,6 +25,7 @@ import cv2
 import torchvision
 import sklearn
 from sklearn.cluster import KMeans
+from unidecode import unidecode
 
 
 # Import data_config
@@ -43,6 +45,19 @@ from src.data.data_utils import (
     prepare_esposalles,
     prepare_saint_gall,
 )
+
+def select_printable_font(sequence, fonts):
+    font = np.random.choice(fonts)
+    can_generate = False
+    while can_generate is False:
+      for c in sequence:
+        if has_glyph(font, str(c)) is False:
+          font = np.random.choice(fonts)
+          # print(f'Selecting another font for generating {sequence}!. Cannot generate {c}')
+          break
+      can_generate = True
+
+    return font
 
 class HTRDatasetSynthRandom(Dataset):
     def __init__(self, vocab, total_words, max_len, fonts, transform=None):
@@ -72,15 +87,14 @@ class HTRDatasetSynthRandom(Dataset):
             word += self.vocab[char]
         return word
 
-
-    def generate_printable_word(self, word):
+    def select_printable_font(self, sequence):
         font = np.random.choice(self.fonts)
         can_generate = False
         while can_generate is False:
-            for c in word:
+            for c in sequence:
                 if has_glyph(font, str(c)) is False:
                     font = np.random.choice(self.fonts)
-                    # print(f'Selecting another font for generating {word}!. Cannot generate {c}')
+                    # print(f'Selecting another font for generating {sequence}!. Cannot generate {c}')
                     break
             can_generate = True
 
@@ -100,13 +114,13 @@ class HTRDatasetSynthRandom(Dataset):
         # Generate image
         while not generated:
             try:
-              font = self.generate_printable_word(sequence)
-              image = get_masked_image(sequence, font, background_colors, text_color)[0]
+              font = self.select_printable_font(sequence)
+              image = generate_image(sequence, font, background_colors, text_color)
               generated = True
             except Exception as e:
               # print(f'Exception {e} while generating image with word {sequence} and font {font}.')
               # sequence = self.generate_random_word(self.max_len)
-              font = self.generate_printable_word(sequence)
+              font = self.select_printable_font(sequence)
               counter_trials -= 1
               if counter_trials == 0:
                   # print(f'Cannot generate image for word {sequence}. Generating other word...')
@@ -119,23 +133,43 @@ class HTRDatasetSynthRandom(Dataset):
         return image, sequence
 
 class HTRDatasetSynth(Dataset):
-    def __init__(self, words, words_distr, fonts, transform=None):
-        self.words = words
-        # self.words_distr = words_distr
+    def __init__(self, sequences, sequences_distr, fonts, transform=None):
+        self.sequences = sequences
+        # self.sequences_distr = sequences_distr
         self.fonts = read_htr_fonts(fonts)
         self.transform = transform
 
     def __len__(self):
-        return len(self.words)
+        return len(self.sequences)
+
+    def crop_sequence(self, sequence):
+        if len(sequence) > 50:
+            # Select a random window from sequence [1, 50]
+            start = np.random.randint(0, len(sequence) - 50)
+            end = start + np.random.randint(1, 50)
+            sequence = sequence[start:end]
+        return sequence
 
     def __getitem__(self, idx):
-        # Get word and read image
-        sequence = self.words[idx] # Generate other word if len(word) == 0:
+        # Get sequence and read image
+        sequence = self.sequences[idx] # Generate other sequence if len(sequence) == 0:
+        # print(f'Sequence: {sequence} to generate image')
         if len(sequence) == 0:
-            print(f'Word {sequence} has length 0. Generating other word...')
-            sequence = np.random.choice(self.words)
+            # print(f'sequence {sequence} has length 0. Generating other sequence...')
+            sequence = np.random.choice(self.sequences)
+
+        if len(sequence) > 50:
+            sequence = self.crop_sequence(sequence)
+            # print(f'Sequence too long. Selecting window of 50 characters: {sequence}')
+
+        sequence = sequence.replace("\n", "")
+        sequence = sequence.strip()
+        sequence = unidecode(sequence)
+
+            # print(f'Sequence too long. Selecting window of 50 characters: {sequence}')
         
-        font = np.random.choice(self.fonts)
+        # font = np.random.choice(self.fonts)
+        font = select_printable_font(sequence, self.fonts)
         generated = False # Flag to check if image is generated correctly, if not, generate again
 
         # text_color = tuple(np.random.randint(0, 256, size=(1,)))
@@ -147,15 +181,37 @@ class HTRDatasetSynth(Dataset):
 
         while not generated:
             try:
-                image = get_masked_image(sequence, font, background_colors, text_color)[0]
+                image = generate_image(sequence, font, background_colors, text_color)
+                # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
                 if self.transform is not None:
                     image = self.transform(image)
 
                 generated = True
             except Exception as e:
-                # print(f'Exception {e} while generating image with word {sequence} and font {font}.')
-                sequence = np.random.choice(self.words)
+                # print(f'Exception {e} while generating image with sequence {sequence} and font {font}.')
+                sequence = np.random.choice(self.sequences)
+                sequence = sequence.replace("\n", "")
+                sequence = unidecode(sequence)
+                if len(sequence) > 50:
+                  sequence = self.crop_sequence(sequence)
+
                 font = np.random.choice(self.fonts)
+
+
+        # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
+
+        # Binarize image using Opencv
+        if len(image.shape) == 3:
+          # Convert to numpy array
+          # image = image.permute(1, 2, 0).numpy()
+          # print(f'Image shape: {image.shape}')
+          # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+          # Binarize image with opencv Otsu algorithm
+          # _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+          # Convert to grayscale image using torchvision
+          image = torchvision.transforms.Grayscale()(image)
+
+
                 
         return image, sequence
 
@@ -166,8 +222,6 @@ class HTRDataset(Dataset):
         self.words = words
         self.transform = transform
         self.binarize = binarize
-
-
 
     def __len__(self):
         return len(self.paths_images)
@@ -199,22 +253,21 @@ class HTRDataset(Dataset):
     def __getitem__(self, idx):
         sequece = self.words[idx]
 
-        if self.binarize:
-          # Read image with opencv
-          image = cv2.imread(self.paths_images[idx])
+        # Read image with opencv
+        image = cv2.imread(self.paths_images[idx])
+
+        if self.binarize:  
           # Convert to grayscale if image is not grayscale
           if len(image.shape) == 3:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
           # Binarize image with opencv Otsu algorithm
           _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-          # Convert to PIL image
-          image = Image.fromarray(image)
-        else:
-          image = Image.open(self.paths_images[idx])
+        # Convert to PIL image
+        image = Image.fromarray(image)
 
         if self.transform:
-            image = self.transform(image)
+          image = self.transform(image)
   
         return image, sequece
 
@@ -333,20 +386,26 @@ class HTRDataModule(pl.LightningDataModule):
                       setfiles = f.read().splitlines()
                   images_paths, words = read_data(ds.images_path, ds.labels_path, setfiles)
                   print(f'Binarize: {configs[_stage].binarize}')
-                  breakpoint()
                   htr_dataset = HTRDataset(images_paths, words, binarize=configs[_stage].binarize, transform=configs[_stage].transforms[0])
 
-              elif isinstance(ds, SynthDatasetConfig): # Synthetic dataset TODO because is per-line not per-word
+              elif isinstance(ds, SynthDatasetConfig):
                   # Read words from json file
-                  with open(ds.words_path, "r") as f:
-                      words = json.load(f)
-                      words, distr = words["words"], words["distr"]
+                  # with open(ds.words_path, "r") as f:
+                  #     words = json.load(f)
+                  #     words, distr = words["words"], [1]*len(words["words"])
 
-                      words_distr, real_distr = [], []
-                      for idx, word in enumerate(words):
-                          words_distr += [word] * distr[idx]
-                          real_distr += [1/distr[idx]] * distr[idx]
-                      words, distr = words_distr, real_distr
+                  #     words_distr, real_distr = [], []
+                  #     for idx, word in enumerate(words):
+                  #         words_distr += [word] * distr[idx]
+                  #         real_distr += [1/distr[idx]] * distr[idx]
+                  #     words, distr = words_distr, real_distr
+                  # Load wikitext-2 dataset from huggingface 
+                  # tokenizer = AutoTokenizer.from_pretrained("wikitext-2")
+                  dataset = load_dataset("wikitext", "wikitext-2-raw-v1")
+                  sequences = dataset["train"]["text"]
+                  real_distr = [1/len(sequences)] * len(sequences) # Balancing not used. Uniform distribution
+                  distr = real_distr
+                  
 
                   ds.stage_sampler = WeightedRandomSampler( # Replacement = False if real distribution is used, True if not (Uniform distribution)
                           weights=real_distr, 
@@ -357,7 +416,7 @@ class HTRDataModule(pl.LightningDataModule):
                   self.__setattr__(_stage + "_sampler", ds.stage_sampler)
                   print(f'Sampler {self.__getattribute__(_stage + "_sampler")} added to datamodule as {self.__getattribute__(_stage + "_sampler")} for stage {_stage}')
 
-                  htr_dataset = HTRDatasetSynth(words, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
+                  htr_dataset = HTRDatasetSynth(sequences, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
               
               elif isinstance(ds, RandomSynthDatasetConfig):
                   htr_dataset =  HTRDatasetSynthRandom(self.vocab[5:], ds.words_to_generate, ds.max_len, ds.fonts_path, transform=configs[_stage].transforms[0])
