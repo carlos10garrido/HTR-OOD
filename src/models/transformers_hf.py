@@ -45,7 +45,7 @@ class HTRTransformerLitModule(LightningModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False, ignore=("datasets"))
+        self.save_hyperparameters(logger=False)#, ignore=("datasets"))
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
@@ -85,8 +85,6 @@ class HTRTransformerLitModule(LightningModule):
         :param x: A tensor of images.
         :return: A tensor of logits.
         """
-        # print(f'x: {x}')
-        # print(f'x.shape: {x.shape}')
         return self.net(x)
 
     def on_fit_start(self) -> None:
@@ -146,21 +144,28 @@ class HTRTransformerLitModule(LightningModule):
           self.metric_logger.log_images(images, str_train_datasets)
 
         labels = batch[1].permute(1, 0)
-        labels[labels == 1] = -100
+        # labels[labels == 1] = -100
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+        labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
+        # breakpoint()
         outputs = self.net(images=images, labels=labels)
 
-        logits = outputs.logits
+        # Check if outputs is an instance of Hugging Face ModelOutput
+        if hasattr(outputs, 'logits'):
+          logits = outputs.logits
+          loss = outputs.loss
+        else:
+          logits = outputs
+          loss = self.criterion(logits.view(-1, logits.shape[-1]), labels.view(-1))
 
-        # loss = self.criterion(logits.view(-1, logits.shape[-1]), labels.view(-1))
-        loss = outputs.loss
+        
         # print(f'loss: {loss}')
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
 
         if batch_idx < 10:
+          print(f'Generating training images...')
           for i in range(images.shape[0]):
             # images_ = self.metric_logger.log_images(images[i], f'train/training_images_{self.train_datasets[0]}')
             images_ = images[i]
@@ -200,7 +205,6 @@ class HTRTransformerLitModule(LightningModule):
         epoch = self.current_epoch
 
         images, labels = batch[0], batch[1]
-        print(f'images.shape: {images.shape}')
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
 
@@ -212,8 +216,6 @@ class HTRTransformerLitModule(LightningModule):
         
         preds = self.net.predict_greedy(images).sequences
         preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
-        # print(f'preds[:10]: {preds.sequences[:10]}')
-        print(f'preds[:10]: {preds[:10]}')
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -233,7 +235,7 @@ class HTRTransformerLitModule(LightningModule):
           self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
           self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
 
-          print(f'VAL Label: {_label}. Pred: {_pred}')
+          # print(f'VAL Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
           if batch_idx < 20:
@@ -249,22 +251,37 @@ class HTRTransformerLitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
 
-        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_val_metrics()
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers = self.metric_logger.log_val_metrics()
         print(f'mean_val_cer: {mean_val_cer}')
         self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        for name, heldout_domain_cer in heldout_domain_cers.items():
+          # Check if heldout_domain_cer is a tensor or list
+          if isinstance(heldout_domain_cer, torch.Tensor):
+            heldout_domain_cer = heldout_domain_cer.item()
+          if isinstance(heldout_domain_cer, list):
+            heldout_domain_cer = heldout_domain_cer[0].item()
+
+          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
         mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_val_metrics()
         self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+        for name, heldout_domain_cer in heldout_domain_cer_minus.items():
+          # Check if heldout_domain_cer is a tensor or list
+          if isinstance(heldout_domain_cer, torch.Tensor):
+            heldout_domain_cer = heldout_domain_cer.item()
+          if isinstance(heldout_domain_cer, list):
+            heldout_domain_cer = heldout_domain_cer[0].item()
+          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
 
 
-    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int) -> None:
+    def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
         """Perform a single test step on a batch of data from the test set.
 
         :param batch: A batch of data (a tuple) containing the input tensor of images and target
@@ -290,9 +307,8 @@ class HTRTransformerLitModule(LightningModule):
           str_train_datasets = f'test_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
         
-        preds = self.net.predict_greedy(images)
-        # print(f'preds[:10]: {preds.sequences[:10]}')
-        print(f'preds[:10]: {preds[:10]}')
+        preds = self.net.predict_greedy(images).sequences
+        preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
