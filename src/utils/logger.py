@@ -91,6 +91,27 @@ class MetricLogger():
     self.train_losses = []
     self.train_accs = []
 
+  def compute_heldout_domain_cer(self, val_cers):
+    # Calculate heldout-domain CERs
+    heldout_domain_cers = {}
+    for target_dataset in set(self.val_datasets) - set(self.train_datasets):
+      heldout_domain_cer = 0.0
+      heldout_domain_datasets = set(self.val_datasets) - set([target_dataset]) - set(self.train_datasets)
+      if len(heldout_domain_datasets) > 0:
+        for dataset in heldout_domain_datasets:
+          heldout_domain_cer += val_cers[dataset] / len(heldout_domain_datasets)
+        
+      heldout_domain_cers[target_dataset] = heldout_domain_cer
+        
+      print(f'HELDOUT-DOMAIN CER excluding {target_dataset} as target and computing for heldout_domain_datasets {heldout_domain_datasets} = {heldout_domain_cer}. Train datasets = {self.train_datasets}')
+      self.logger.experiment.log({f'val/heldout_target_{target_dataset}': heldout_domain_cer, 'epoch': self.current_epoch})
+
+    # Also add the heldout-domain CER in the ID dataset
+    
+
+    return heldout_domain_cers
+      
+
   def log_val_metrics(self):
     """Log validation metrics and return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer."""
 
@@ -98,9 +119,9 @@ class MetricLogger():
 
     # Compute losses, accuracies and CERs per dataset
     for dataset in self.val_datasets:
-      print(f'Computing val_loss, val_acc and val_cer for {dataset}')
-      print(f'len(self.val_losses[dataset]) = {len(self.val_losses[dataset])}')
-      print(f'len(self.val_accs[dataset]) = {len(self.val_accs[dataset])}')
+      # print(f'Computing val_loss, val_acc and val_cer for {dataset}')
+      # print(f'len(self.val_losses[dataset]) = {len(self.val_losses[dataset])}')
+      # print(f'len(self.val_accs[dataset]) = {len(self.val_accs[dataset])}')
       # Loss
       if len(self.val_losses[dataset]) != 0:
         val_loss[dataset] = torch.stack(self.val_losses[dataset]).mean()
@@ -138,6 +159,10 @@ class MetricLogger():
         self.best_val_cers[dataset] = val_cer[dataset]
         print(f'IMPROVED best val_cer[{dataset}]: {self.best_val_cers[dataset]}')
         self.logger.experiment.log({f'best_val_cer_' + dataset: self.best_val_cers[dataset], 'epoch': self.current_epoch})
+
+    # Compute heldout-domain CERs
+    heldout_domain_cers = self.compute_heldout_domain_cer(val_cer)
+    
 
     total_val_cer /= count_nonzero
     mean_val_cer = total_val_cer
@@ -180,11 +205,11 @@ class MetricLogger():
     in_domain_datasets = set(self.train_datasets)
     out_of_domain_datasets = set(self.val_datasets) - set(self.train_datasets)
     # Heldout = Test (always one) - Train (always one). Val that are not in train and also not in test
-    heldout_domain_datasets = set(self.val_datasets) - set(self.train_datasets) - set(self.test_datasets)
+    # heldout_domain_datasets = set(self.val_datasets) - set(self.train_datasets) - set(self.test_datasets)
 
     print(f'IN-DOMAIN datasets = {in_domain_datasets}')
     print(f'OUT-OF-DOMAIN datasets = {out_of_domain_datasets}')
-    print(f'HELDOUT-DOMAIN datasets = {heldout_domain_datasets}')
+    # print(f'HELDOUT-DOMAIN datasets = {heldout_domain_datasets}')
 
     
     for dataset in in_domain_datasets:
@@ -200,27 +225,28 @@ class MetricLogger():
 
 
     # Heldout-domains CER
-    if len(heldout_domain_datasets) > 0:
-      for dataset in heldout_domain_datasets:
-        if dataset in self.val_datasets:
-          heldout_domain_cer += val_cer[dataset] / len(heldout_domain_datasets)
-          heldout_domain_wer += val_wer[dataset] / len(heldout_domain_datasets)
+    # if len(heldout_domain_datasets) > 0:
+    #   for dataset in heldout_domain_datasets:
+    #     if dataset in self.val_datasets:
+    #       heldout_domain_cer += val_cer[dataset] / len(heldout_domain_datasets)
+    #       heldout_domain_wer += val_wer[dataset] / len(heldout_domain_datasets)
     
 
     print(f'IN-DOMAIN CER = {in_domain_cer}')
     print(f'OUT-OF-DOMAIN CER = {out_of_domain_cer}')
     print(f'IN-DOMAIN WER = {in_domain_wer}')
     print(f'OUT-OF-DOMAIN WER = {out_of_domain_wer}')
-    print(f'HELDOUT-DOMAIN CER = {heldout_domain_cer}')
-    print(f'HELDOUT-DOMAIN WER = {heldout_domain_wer}')
+    # print(f'HELDOUT-DOMAIN CER = {heldout_domain_cer}')
+    # print(f'HELDOUT-DOMAIN WER = {heldout_domain_wer}')
 
     # self.log('in_domain_cer_epoch', in_domain_cer, on_epoch=True, prog_bar=True, logger=True)
     self.logger.experiment.log({f'val/in_domain_val_cer_epoch': in_domain_cer, 'epoch': self.current_epoch})
     self.logger.experiment.log({f'val/in_domain_val_wer_epoch': in_domain_wer, 'epoch': self.current_epoch})
     self.logger.experiment.log({f'val/out_of_domain_val_cer_epoch': out_of_domain_cer, 'epoch': self.current_epoch})
     self.logger.experiment.log({f'val/out_of_domain_val_wer_epoch': out_of_domain_wer, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'val/heldout_domain_val_cer_epoch': heldout_domain_cer, 'epoch': self.current_epoch})
-    self.logger.experiment.log({f'val/heldout_domain_val_wer_epoch': heldout_domain_wer, 'epoch': self.current_epoch})
+
+    # self.logger.experiment.log({f'val/heldout_domain_val_cer_epoch': heldout_domain_cer, 'epoch': self.current_epoch})
+    # self.logger.experiment.log({f'val/heldout_domain_val_wer_epoch': heldout_domain_wer, 'epoch': self.current_epoch})
 
     if self.best_in_domain_val_cer > in_domain_cer:
       self.best_in_domain_val_cer = in_domain_cer
@@ -255,7 +281,7 @@ class MetricLogger():
 
     # Return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer
 
-    return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer
+    return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers
 
 
   def log_test_metrics(self):
@@ -280,9 +306,9 @@ class MetricLogger():
 
 
       
-  def log(self, message):
-      self.log_file.write(message + '\n')
-      self.log_file.flush()
+  # def log(self, message):
+  #     self.log_file.write(message + '\n')
+  #     self.log_file.flush()
 
   def close(self):
       self.log_file.close()
