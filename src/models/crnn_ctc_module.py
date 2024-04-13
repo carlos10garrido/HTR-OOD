@@ -27,7 +27,7 @@ class CRNN_CTC_Module(LightningModule):
         _logger: Any,
         datasets: dict,
     ) -> None:
-        """Initialize a `MNISTLitModule`.
+        """Initialize a `CRNN_CTC_Module`.
 
         :param net: The model to train.
         :param optimizer: The optimizer to use for training.
@@ -209,7 +209,7 @@ class CRNN_CTC_Module(LightningModule):
           
           _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
 
-          print(f'Label: {_label} - Pred: {_pred}')
+          # print(f'Label: {_label} - Pred: {_pred}')
 
           # Calculate CER converting mayus to minus
           _label_minus = _label.lower()
@@ -220,9 +220,9 @@ class CRNN_CTC_Module(LightningModule):
 
           # Calculate CER
           cer = CER()(_pred, _label)
-          if batch_idx < 15:
-            orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
+          # if batch_idx < 15:
+          #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+          #   self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
 
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
@@ -235,19 +235,35 @@ class CRNN_CTC_Module(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
 
-        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_val_metrics()
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers = self.metric_logger.log_val_metrics()
         print(f'mean_val_cer: {mean_val_cer}')
         self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        # self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        for name, heldout_domain_cer in heldout_domain_cers.items():
+          # Check if heldout_domain_cer is a tensor or list
+          if isinstance(heldout_domain_cer, torch.Tensor):
+            heldout_domain_cer = heldout_domain_cer.item()
+          if isinstance(heldout_domain_cer, list):
+            heldout_domain_cer = heldout_domain_cer[0].item()
+
+          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_val_metrics()
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cers_minus = self.metric_logger_minusc.log_val_metrics()
         self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+        # self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+        for name, heldout_domain_cer in heldout_domain_cers_minus.items():
+          # Check if heldout_domain_cer is a tensor or list
+          if isinstance(heldout_domain_cer, torch.Tensor):
+            heldout_domain_cer = heldout_domain_cer.item()
+          if isinstance(heldout_domain_cer, list):
+            heldout_domain_cer = heldout_domain_cer[0].item()
+          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
+
         
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> None:
       """Perform a single TEST step on a batch of data from the TEST set."""
