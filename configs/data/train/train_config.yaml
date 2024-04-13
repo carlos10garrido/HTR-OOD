@@ -8,25 +8,76 @@ train_config:
   img_size: [64,256]
   binarize: True
   batch_size: 128
-  num_workers: 8
+  num_workers: 4
   pin_memory: False
   vocab_path: ${paths.data_dir}/vocab.txt
   transforms:
     - _target_: torchvision.transforms.v2.Compose
       transforms:
-        - _target_: torchvision.transforms.v2.ToTensor
-        # - _target_: torchvision.transforms.v2.RandomApply
-        #   p: 0.7
-        #   transforms:
-        #     - _target_: torchvision.transforms.v2.RandomAffine
-        #       degrees: [0, 0]
-        #       translate: [0.05, 0.05]
-        #       scale: [0.9, 0.9]
-        #       shear: [-2, 2, -2, 2]
-        #       fill: 1
         # - _target_: torchvision.transforms.v2.RandomApply
         #   p: 1.0
-        #   transforms: # Add padding transformation
-        #     - _target_: torchvision.transforms.v2.Pad
-        #       padding: 5
-        #       fill: 1
+        #   transforms:
+        #   - _target_: src.data.data_utils.Dilation # TODO: Check if this is the right transformation!
+        #     kernel_size: 3
+        #     iterations: 1
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #     p: 1.0
+        #     transforms:
+        #       - _target_: src.data.data_utils.Erosion # TODO: Check if this is the right transformation!
+        #         kernel_size: 5
+        #         iterations: 1
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 1.0
+        #   transforms: # (σ = 8 and α = 64)
+        #     - _target_: torchvision.transforms.v2.ElasticTransform
+        #       sigma: 5.0
+        #       alpha: 5.0
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 1.0
+        #   transforms: # Slant
+        #     - _target_: torchvision.transforms.v2.RandomAffine
+        #       degrees: [-45, 45]
+              
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.2
+        #   transforms: # Brightness
+        #     - _target_: torchvision.transforms.v2.ColorJitter
+        #       brightness: 0.25
+        #       contrast: 0
+        #       saturation: 0
+        #       hue: 0
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.2
+        #   transforms: # Sharpness
+        #     - _target_: torchvision.transforms.v2.RandomAdjustSharpness
+        #       sharpness_factor: 1.25
+        #       p: 1.0
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.2
+        #   transforms: # Sharpness
+        #     - _target_: torchvision.transforms.v2.RandomAdjustSharpness
+        #       sharpness_factor: 0.75
+        #       p: 1.0
+        
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.2
+        #   transforms: # Perspective
+        #     - _target_: torchvision.transforms.v2.RandomPerspective
+        #       distortion_scale: 0.5
+        #       p: 1.0
+
+        # - _target_: torchvision.transforms.v2.RandomApply
+        #   p: 0.2
+        #   transforms: # Rotation
+        #     - _target_: torchvision.transforms.v2.RandomRotation
+        #       degrees: [-3, 3] # pi/60 radians
+        #       p: 1.0
+
+        - _target_: torchvision.transforms.v2.ToTensor
+
+        
