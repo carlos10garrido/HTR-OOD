@@ -248,30 +248,36 @@ class MetricLogger():
     # self.logger.experiment.log({f'val/heldout_domain_val_cer_epoch': heldout_domain_cer, 'epoch': self.current_epoch})
     # self.logger.experiment.log({f'val/heldout_domain_val_wer_epoch': heldout_domain_wer, 'epoch': self.current_epoch})
 
-    if self.best_in_domain_val_cer > in_domain_cer:
-      self.best_in_domain_val_cer = in_domain_cer
-      print(f'IMPROVED best in_domain_cer: {self.best_in_domain_val_cer}')
-      self.logger.experiment.log({f'best_in_domain_val_cer': self.best_in_domain_val_cer, 'epoch': self.current_epoch})
+    # Check if the dataset is minusc or not
+    # convert set to list and check if minusc is in the list
+    if "minusc" not in list(in_domain_datasets)[0]: # Assuming there's only one in_domain_dataset
+      if self.best_in_domain_val_cer > in_domain_cer:
+        self.best_in_domain_val_cer = in_domain_cer
+        print(f'IMPROVED best in_domain_cer: {self.best_in_domain_val_cer}')
+        self.logger.experiment.log({f'best_in_domain_val_cer': self.best_in_domain_val_cer, 'epoch': self.current_epoch})
 
-    if self.best_in_domain_val_wer > in_domain_wer:
-      self.best_in_domain_val_wer = in_domain_wer
-      print(f'IMPROVED best in_domain_wer: {self.best_in_domain_val_wer}')
-      self.logger.experiment.log({f'best_in_domain_val_wer': self.best_in_domain_val_wer, 'epoch': self.current_epoch})
+    if "minusc" not in list(in_domain_datasets)[0]: # Assuming there's only one in_domain_dataset
+      if self.best_in_domain_val_wer > in_domain_wer:
+        self.best_in_domain_val_wer = in_domain_wer
+        print(f'IMPROVED best in_domain_wer: {self.best_in_domain_val_wer}')
+        self.logger.experiment.log({f'best_in_domain_val_wer': self.best_in_domain_val_wer, 'epoch': self.current_epoch})
 
     # self.log('out_of_domain_cer_epoch', out_of_domain_cer, on_epoch=True, prog_bar=True, logger=True)
     self.logger.experiment.log({f'out_of_domain_val_cer_epoch': out_of_domain_cer, 'epoch': self.current_epoch})
     self.logger.experiment.log({f'out_of_domain_val_wer_epoch': out_of_domain_wer, 'epoch': self.current_epoch})
 
-    if self.best_out_domain_val_cer > out_of_domain_cer:
-      self.best_out_domain_val_cer = out_of_domain_cer
-      print(f'IMPROVED best out_domain_cer: {self.best_out_domain_val_cer}')
-      self.logger.experiment.log({f'best_out_domain_val_cer': self.best_out_domain_val_cer, 'epoch': self.current_epoch})
-
-    if self.best_out_domain_val_wer > out_of_domain_wer:
-      self.best_out_domain_val_wer = out_of_domain_wer
-      print(f'IMPROVED best out_domain_wer: {self.best_out_domain_val_wer}')
-      self.logger.experiment.log({f'best_out_domain_val_wer': self.best_out_domain_val_wer, 'epoch': self.current_epoch})
+    if "minusc" not in list(in_domain_datasets)[0]: # Assuming there's only one in_domain_dataset
+      if self.best_out_domain_val_cer > out_of_domain_cer:
+        self.best_out_domain_val_cer = out_of_domain_cer
+        print(f'IMPROVED best out_domain_cer: {self.best_out_domain_val_cer}')
+        self.logger.experiment.log({f'best_out_domain_val_cer': self.best_out_domain_val_cer, 'epoch': self.current_epoch})
     
+    if "minusc" not in list(in_domain_datasets)[0]: # Assuming there's only one in_domain_dataset
+      if self.best_out_domain_val_wer > out_of_domain_wer:
+        self.best_out_domain_val_wer = out_of_domain_wer
+        print(f'IMPROVED best out_domain_wer: {self.best_out_domain_val_wer}')
+        self.logger.experiment.log({f'best_out_domain_val_wer': self.best_out_domain_val_wer, 'epoch': self.current_epoch})
+      
 
     # Reset lists
     self.val_losses = {val_dataset: [] for val_dataset in self.val_datasets}
