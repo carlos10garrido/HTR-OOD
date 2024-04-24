@@ -470,7 +470,9 @@ class Dilation(object):
     # First invert the image
     image = cv2.bitwise_not(np.array(image))
     image = cv2.dilate(image, self.kernel, iterations=self.iterations)
-    return cv2.bitwise_not(image)
+    image =  cv2.bitwise_not(image)
+    image = Image.fromarray(image)
+    return image
     # return cv2.dilate(np.array(image), self.kernel, iterations=self.iterations)
 
 # Erosion class for transform using opencv
@@ -483,7 +485,11 @@ class Erosion(object):
     # First invert the image
     image = cv2.bitwise_not(np.array(image))
     image = cv2.erode(image, self.kernel, iterations=self.iterations)
-    return cv2.bitwise_not(image)
+    image = cv2.bitwise_not(image)
+    # Convert image to PIL image
+    image = Image.fromarray(image)
+    return image
+    
     # return cv2.erode(np.array(image), self.kernel, iterations=self.iterations)
 
 class Binarization(object):
