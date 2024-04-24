@@ -113,14 +113,14 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
       
 
     model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
-    # Train the model
-    trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
     
-
-    # Predict iterating over images
-    # breakpoint()
-    results = trainer.test(model, datamodule.test_dataloader())
-    print(f'PREDICTIONS: {results}')
+    if cfg.train is True:
+        print(f'TRAINING MODEL: {model}')
+        trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
+        trainer.test(model, datamodule.test_dataloader())
+    else:
+        print(f'MODEL WILL NOT BE TRAINED: {model}. Only testing will be performed.')
+        trainer.test(model, datamodule.test_dataloader())
 
     
 
