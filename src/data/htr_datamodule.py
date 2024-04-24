@@ -143,12 +143,19 @@ class HTRDatasetSynth(Dataset):
         return len(self.sequences)
 
     def crop_sequence(self, sequence):
-        if len(sequence) > 50:
-            # Select a random window from sequence [1, 50]
-            start = np.random.randint(0, len(sequence) - 50)
-            end = start + np.random.randint(1, 50)
-            sequence = sequence[start:end]
-        return sequence
+      if len(sequence) > 50:
+        start = np.random.randint(0, len(sequence) - 50)
+        end = start + np.random.randint(1, 50)
+
+        while sequence[start] != ' ' and start > 0: # Between a character
+          start -= 1
+
+        while sequence[end] != ' ' and end < len(sequence)-1:
+          end += 1
+
+        return sequence[start+1:end]
+    
+      return sequence
 
     def __getitem__(self, idx):
         # Get sequence and read image
@@ -401,20 +408,25 @@ class HTRDataModule(pl.LightningDataModule):
                   #     words, distr = words_distr, real_distr
                   # Load wikitext-2 dataset from huggingface 
                   # tokenizer = AutoTokenizer.from_pretrained("wikitext-2")
-                  dataset = load_dataset("wikitext", "wikitext-2-raw-v1")
-                  sequences = dataset["train"]["text"]
+                  # dataset = load_dataset("wikitext", "wikitext-2-raw-v1")
+                  # sequences = dataset["train"]["text"]
+                  # real_distr = [1/len(sequences)] * len(sequences) # Balancing not used. Uniform distribution
+                  # distr = real_distr
+                  # Read all sequences from dataset path
+                  sequences = open(ds.words_path, "r").read().split("\n")
+                  print(f'Number of sequences in dataset {dataset}: {len(sequences)} in stage {_stage}')
                   real_distr = [1/len(sequences)] * len(sequences) # Balancing not used. Uniform distribution
                   distr = real_distr
                   
 
-                  ds.stage_sampler = WeightedRandomSampler( # Replacement = False if real distribution is used, True if not (Uniform distribution)
-                          weights=real_distr, 
-                          num_samples=len(real_distr), 
-                          replacement=False if ds.distr else True
-                  )
+                  # ds.stage_sampler = WeightedRandomSampler( # Replacement = False if real distribution is used, True if not (Uniform distribution)
+                  #         weights=real_distr, 
+                  #         num_samples=len(real_distr), 
+                  #         replacement=False if ds.distr else True
+                  # )
 
-                  self.__setattr__(_stage + "_sampler", ds.stage_sampler)
-                  print(f'Sampler {self.__getattribute__(_stage + "_sampler")} added to datamodule as {self.__getattribute__(_stage + "_sampler")} for stage {_stage}')
+                  # self.__setattr__(_stage + "_sampler", ds.stage_sampler)
+                  # print(f'Sampler {self.__getattribute__(_stage + "_sampler")} added to datamodule as {self.__getattribute__(_stage + "_sampler")} for stage {_stage}')
 
                   htr_dataset = HTRDatasetSynth(sequences, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
               
