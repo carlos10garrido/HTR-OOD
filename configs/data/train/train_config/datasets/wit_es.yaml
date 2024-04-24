@@ -1,0 +1,6 @@
+wit_es:
+  _target_: src.data.data_config.SynthDatasetConfig
+  name: wit_es
+  words_path: ${paths.data_dir}/synth/wit_dataset/wit-dataset-es-train.txt
+  fonts_path: ${paths.data_dir}/synth/final_fonts_rendered/
+  distr: True

@@ -1,0 +1,52 @@
+
+- _target_: torchvision.transforms.v2.Compose
+  transforms:
+    # Transformations for real data (rotation, dilation, erosion, perspective, elastic transform, shear, nose
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.5
+      transforms:
+      - _target_: src.data.data_utils.Dilation 
+        kernel_size: 3
+        iterations: 1
+
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.5
+      transforms:
+      - _target_: src.data.data_utils.Erosion
+        kernel_size: 2
+        iterations: 1
+
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.5
+      transforms: # (σ = 8 and α = 64 intially, was too much)
+        - _target_: torchvision.transforms.v2.ElasticTransform
+          sigma: 5.0
+          alpha: 5.0
+          fill: 255
+
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.5
+      transforms: # Rotation, Translation, Shear as a single transformation
+        - _target_: torchvision.transforms.v2.RandomAffine
+          degrees: 1
+          translate: [0.01, 0.05]
+          # scale: [0.7, 1.0]
+          shear: [-1, 1, -1, 1] # Pixels are sheared by a factor of 5
+          fill: 255 # Fill with white
+
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.5
+      transforms: # Perspective
+        - _target_: torchvision.transforms.v2.RandomPerspective
+          distortion_scale: 0.2
+          p: 1.0
+          fill: 255
+
+    - _target_: torchvision.transforms.v2.RandomApply # Gaussian Noise
+      p: 0.5
+      transforms:
+        - _target_: torchvision.transforms.v2.GaussianBlur
+          kernel_size: 3
+          sigma: 2.0
+    
+    - _target_: torchvision.transforms.v2.ToTensor
