@@ -12,7 +12,6 @@ class CRNN_Puig(nn.Module):
     ) -> None:
         """Initialize the model."""
         super().__init__()
-        self.backbone = torch.hub.load('pytorch/vision', 'resnet18', pretrained=True)
         self.proj_channels = nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0)
 
         # Original CRNN backbone (Puigcerver et al., 2017, ICDAR)
@@ -70,14 +69,17 @@ class CRNN_Puig(nn.Module):
       :return: A tensor of predictions.
       """
       # breakpoint()
+      # print(f'x.shape: {x.shape} IMAGES IN FORWARD')
       B, C, H, W = x.shape
       x = self.proj_channels(x) if C == 1 else x
       x = self.backbone(x)
-      print(f'x.shape: {x.shape} after backbone')
+      # print(f'x.shape: {x.shape} after backbone')
       x = x.view(B, x.shape[1]*x.shape[2], x.shape[3]).permute(0, 2, 1)
-      print(f'x.shape: {x.shape} after view and permute')
+      # print(f'x.shape: {x.shape} after view and permute')
+      self.lstm.flatten_parameters()
+      # breakpoint()
       x, _ = self.lstm(x)
-      print(f'x.shape: {x.shape} after lstm')
+      # print(f'x.shape: {x.shape} after lstm')
       return self.out(x)
     
 
