@@ -74,6 +74,21 @@ class CRNN_CTC_Module(LightningModule):
           'test_datasets': self.test_datasets,
         })
 
+        self.metric_logger = MetricLogger(
+          logger=self._logger,
+          train_datasets=self.train_datasets,
+          val_datasets=self.val_datasets,
+          test_datasets=self.test_datasets,
+        )
+
+        self.metric_logger_minusc = MetricLogger(
+          logger=self._logger,
+          # Append minusc to val_datasets and test_datasets
+          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
+          val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
+          test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
 
@@ -90,20 +105,20 @@ class CRNN_CTC_Module(LightningModule):
         # self.val_loss.reset()
         # Reset metrics for each dataset
 
-        self.metric_logger = MetricLogger(
-          logger=self._logger,
-          train_datasets=self.train_datasets,
-          val_datasets=self.val_datasets,
-          test_datasets=self.test_datasets,
-        )
+        # self.metric_logger = MetricLogger(
+        #   logger=self._logger,
+        #   train_datasets=self.train_datasets,
+        #   val_datasets=self.val_datasets,
+        #   test_datasets=self.test_datasets,
+        # )
 
-        self.metric_logger_minusc = MetricLogger(
-          logger=self._logger,
-          # Append minusc to val_datasets and test_datasets
-          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
-          val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
-          test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
-        )
+        # self.metric_logger_minusc = MetricLogger(
+        #   logger=self._logger,
+        #   # Append minusc to val_datasets and test_datasets
+        #   train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
+        #   val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
+        #   test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
+        # )
         
     def decode_text(self, text, vocab_size):
         """Decode the text from the vocabulary."""
@@ -135,7 +150,7 @@ class CRNN_CTC_Module(LightningModule):
 
         images, labels, padded_cols = batch[0], batch[1], batch[2]
         dataset = self.train_datasets[dataloader_idx]
-        print(f'Images shape: {images.shape}')
+        # print(f'Images shape: {images.shape}')
         if self.current_epoch == 0 and self.global_step <= 1:
           str_train_datasets = f'train_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
@@ -200,7 +215,7 @@ class CRNN_CTC_Module(LightningModule):
 
         preds = self.net(images).squeeze(-1).clone().argmax(-1)
         total_cer_per_batch = 0.0
-        print(f'---VALIDATION STEP----- ended')
+        # print(f'---VALIDATION STEP----- ended')
         
         for i in range(images.shape[0]):
           _label = labels[i].detach().cpu().numpy().tolist()
@@ -230,7 +245,7 @@ class CRNN_CTC_Module(LightningModule):
           
           total_cer_per_batch += cer
 
-        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
+        # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
@@ -278,13 +293,10 @@ class CRNN_CTC_Module(LightningModule):
       dataset = self.test_datasets[dataloader_idx]
 
       preds = self.net(images).squeeze(-1)
-      print(f'TEST Preds shape: {preds.shape}')
       preds = preds.clone().argmax(-1)
-      print(f'TEST Preds after argmax: {preds[:10]}')
-      # preds  = torch.unique_consecutive(preds, dim=-1)
 
       total_cer_per_batch = 0.0
-      print(f'-- TEST STEP----- ended')
+      # print(f'-- TEST STEP----- ended')
       
       for i in range(images.shape[0]):
         _label = labels[i].detach().cpu().numpy().tolist()
@@ -293,7 +305,7 @@ class CRNN_CTC_Module(LightningModule):
 
         _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
 
-        print(f'Label: {_label} - Pred: {_pred}')
+        # print(f'Label: {_label} - Pred: {_pred}')
 
         # Calculate CER converting mayus to minus
         _label_minus = _label.lower()
@@ -303,7 +315,7 @@ class CRNN_CTC_Module(LightningModule):
 
         # Calculate CER
         cer = CER()(_pred, _label)
-        if batch_idx < 15:
+        if batch_idx < 2:
           orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
           # self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(image_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
           self._logger.experiment.log({f'test/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
@@ -314,7 +326,7 @@ class CRNN_CTC_Module(LightningModule):
         
         total_cer_per_batch += cer
 
-      print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
+      # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
       
 
     def on_test_epoch_end(self) -> None:
