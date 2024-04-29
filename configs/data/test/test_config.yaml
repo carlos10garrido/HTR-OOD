@@ -6,7 +6,7 @@ test_config:
   _target_: src.data.data_config.DataConfig
   stage: test
   img_size: [64,128]
-  binarize: True
+  binarize: ${data.train_config.binarize} # Use the same binarize value as in train
   batch_size: 32
   num_workers: 4
   pin_memory: True
