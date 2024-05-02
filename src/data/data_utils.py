@@ -15,7 +15,7 @@ import cv2
 
 from unidecode import unidecode
 
-PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
+PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
 # 'pad_token_id': 1, bos_token_id': 0,  'eos_token_id': 2,
 # Old: ['<pad>', '<sos>', '<eos>', '<unk>']
 # 'bos_token_id': 0 'pad_token_id': 1 'eos_token_id': 2
@@ -23,23 +23,23 @@ PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
 # special_symbols = ['<pad>', '<sos>', '<eos>', '<unk>']
 
 # tokenize only separing per characters 
-def tokenize(text):
-    # return list(text)
-    return list(unidecode(text))
+# def tokenize(text):
+#     # return list(text)
+#     return list(unidecode(text))
 
-# helper function to club together sequential operations
-def sequential_transforms(*transforms):
-    def func(txt_input):
-        for transform in transforms:
-            txt_input = transform(txt_input)
-        return txt_input
-    return func
+# # helper function to club together sequential operations
+# def sequential_transforms(*transforms):
+#     def func(txt_input):
+#         for transform in transforms:
+#             txt_input = transform(txt_input)
+#         return txt_input
+#     return func
 
-# function to add BOS/EOS and create tensor for input sequence indices
-def tensor_transform(token_ids: List[int]):
-    return torch.cat((torch.tensor([SOS_IDX]),
-                      torch.tensor(token_ids),
-                      torch.tensor([EOS_IDX])))
+# # function to add BOS/EOS and create tensor for input sequence indices
+# def tensor_transform(token_ids: List[int]):
+#     return torch.cat((torch.tensor([SOS_IDX]),
+#                       torch.tensor(token_ids),
+#                       torch.tensor([EOS_IDX])))
 
 def read_htr_fonts(fonts_path):
   fonts = []
