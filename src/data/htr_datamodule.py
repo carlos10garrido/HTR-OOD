@@ -31,13 +31,16 @@ from unidecode import unidecode
 # Import data_config
 from src.data.data_config import DataConfig, DatasetConfig, SynthDatasetConfig, RandomSynthDatasetConfig
 
+# Import tokenizer
+from src.data.components.tokenizers import Tokenizer
+
 from src.utils import pylogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 from src.data.data_utils import (
-    tensor_transform,
-    sequential_transforms,
-    tokenize,
+    # tensor_transform,
+    # sequential_transforms,
+    # tokenize,
     collate_fn,
     has_glyph,
     generate_image,
@@ -275,6 +278,10 @@ class HTRDataset(Dataset):
 
         if self.transform:
           image = self.transform(image)
+
+        # If channels == 1, repeat the channel 3 times to have always a RGB image
+        if image.shape[0] == 1:
+          image = image.repeat(3, 1, 1)
   
         return image, sequece
 
@@ -285,6 +292,7 @@ class HTRDataModule(pl.LightningDataModule):
       train_config: DataConfig,
       val_config: DataConfig,
       test_config: DataConfig,
+      tokenizer: Tokenizer,
       seed: int = 42
       ):
         super().__init__()
@@ -297,42 +305,47 @@ class HTRDataModule(pl.LightningDataModule):
         torch.manual_seed(self.seed)
 
         # Setting up vocab and text transforms
-        vocab = open(self.train_config.vocab_path, 'r').read().split('\n')
-        vocab = sorted(list(vocab))
+        # vocab = open(self.train_config.vocab_path, 'r').read().split('\n')
+        # vocab = sorted(list(vocab))
+        # self.vocab = tokenizer.vocab
+        self.vocab_size = tokenizer.vocab_size
 
         # Add special tokens to vocab ('et' for Saint-Gall, 'ç' for Esposalles)
         # vocab = ['<pad>', '<sos>', '<eos>', '<unk>'] + vocab + ['et'] + ['ç']
-        vocab = ['<sos>', '<pad>','<eos>', '<unk>'] + vocab + ['et'] + ['ç']
-        self.vocab = vocab
-        self.vocab_size = len(self.vocab)
-        log.info(f'VOCAB: {self.vocab}')
-        log.info(f'VOCAB SIZE: {self.vocab_size}')
+        # vocab = ['<sos>', '<pad>','<eos>', '<unk>'] + vocab + ['et'] + ['ç']
+        # self.vocab = vocab
+        # self.vocab_size = len(self.vocab)
+        # log.info(f'VOCAB: {self.vocab}')
+        # log.info(f'VOCAB SIZE: {self.vocab_size}')
 
-        # Set encoding and decoding functions
-        stoi = {s: i for i, s in enumerate(self.vocab)}
-        itos = {i: s for i, s in enumerate(self.vocab)}
+        # # Set encoding and decoding functions
+        # stoi = {s: i for i, s in enumerate(self.vocab)}
+        # itos = {i: s for i, s in enumerate(self.vocab)}
 
-        global encode
-        global decode 
+        # global encode
+        # global decode 
 
-        encode = lambda s: [stoi[token] for token in s]
-        decode = lambda x: [itos[i] for i in x]
-        self.encode = encode
-        self.decode = decode
+        # encode = lambda s: [stoi[token] for token in s]
+        # decode = lambda x: [itos[i] for i in x]
+        # self.encode = encode
+        # self.decode = decode
 
-        # Make self.encode and self.decode global functions
-               
+        # # Make self.encode and self.decode global functions
+
+
+        self.text_transform = tokenizer.tokenize       
         
         
-        print(f'Constructing HTRDataModule with vocab {self.vocab}')
+        # print(f'Constructing HTRDataModule with vocab {self.vocab}')
         print(f'VOCAB SIZE {self.vocab_size}')
 
-        self.vocab_transform = self.encode
-        self.text_transform = sequential_transforms(
-            tokenize, # Tokenization (split into characters)
-            self.vocab_transform, # Numericalization (from chars to ints)
-            tensor_transform # Add BOS/EOS and create tensor of ints
-        )
+        # self.vocab_transform = self.encode
+        # self.text_transform = sequential_transforms(
+        #     # tokenize, # Tokenization (split into characters)
+        #     # # self.vocab_transform, # Numericalization (from chars to ints)
+        #     # tensor_transform # Add BOS/EOS and create tensor of ints
+        # )
+        self.text_transform = tokenizer.prepare_text
 
         self.save_hyperparameters(logger=False)
         log.info(f'HYPERPARAMETERS: {self.hparams}')
@@ -430,6 +443,7 @@ class HTRDataModule(pl.LightningDataModule):
 
                   htr_dataset = HTRDatasetSynth(sequences, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
               
+              # TODO: REVIEW THIS VOCABULARY
               elif isinstance(ds, RandomSynthDatasetConfig):
                   htr_dataset =  HTRDatasetSynthRandom(self.vocab[5:], ds.words_to_generate, ds.max_len, ds.fonts_path, transform=configs[_stage].transforms[0])
                   print(f'Generating data with vocab {self.vocab[5:]}') # Remove special tokens from vocab and whitespace
