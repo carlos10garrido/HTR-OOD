@@ -49,19 +49,6 @@ from src.data.data_utils import (
     prepare_saint_gall,
 )
 
-def select_printable_font(sequence, fonts):
-    font = np.random.choice(fonts)
-    can_generate = False
-    while can_generate is False:
-      for c in sequence:
-        if has_glyph(font, str(c)) is False:
-          font = np.random.choice(fonts)
-          # print(f'Selecting another font for generating {sequence}!. Cannot generate {c}')
-          break
-      can_generate = True
-
-    return font
-
 class HTRDatasetSynthRandom(Dataset):
     def __init__(self, vocab, total_words, max_len, fonts, transform=None):
         self.vocab = vocab
@@ -266,6 +253,11 @@ class HTRDataset(Dataset):
         # Read image with opencv
         image = cv2.imread(self.paths_images[idx])
 
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) 
+
+        # Write image on outputs/ folder to check if image is read correctly
+        cv2.imwrite(f'outputs/train_{self.paths_images[idx].split("/")[-1]}', image)
+
         if self.binarize:  
           # Convert to grayscale if image is not grayscale
           if len(image.shape) == 3:
@@ -275,6 +267,11 @@ class HTRDataset(Dataset):
 
         # Convert to PIL image
         image = Image.fromarray(image)
+
+        # Write image on disk to check if image is read correctly
+        image.save(f'outputs/train_np_array{self.paths_images[idx].split("/")[-1]}')
+
+
 
         if self.transform:
           image = self.transform(image)
@@ -303,48 +300,12 @@ class HTRDataModule(pl.LightningDataModule):
         # Seed everything with Pytorch Lightning
         pl.seed_everything(self.seed, workers=True)
         torch.manual_seed(self.seed)
-
-        # Setting up vocab and text transforms
-        # vocab = open(self.train_config.vocab_path, 'r').read().split('\n')
-        # vocab = sorted(list(vocab))
-        # self.vocab = tokenizer.vocab
         self.vocab_size = tokenizer.vocab_size
-
-        # Add special tokens to vocab ('et' for Saint-Gall, 'ç' for Esposalles)
-        # vocab = ['<pad>', '<sos>', '<eos>', '<unk>'] + vocab + ['et'] + ['ç']
-        # vocab = ['<sos>', '<pad>','<eos>', '<unk>'] + vocab + ['et'] + ['ç']
-        # self.vocab = vocab
-        # self.vocab_size = len(self.vocab)
-        # log.info(f'VOCAB: {self.vocab}')
-        # log.info(f'VOCAB SIZE: {self.vocab_size}')
-
-        # # Set encoding and decoding functions
-        # stoi = {s: i for i, s in enumerate(self.vocab)}
-        # itos = {i: s for i, s in enumerate(self.vocab)}
-
-        # global encode
-        # global decode 
-
-        # encode = lambda s: [stoi[token] for token in s]
-        # decode = lambda x: [itos[i] for i in x]
-        # self.encode = encode
-        # self.decode = decode
-
-        # # Make self.encode and self.decode global functions
-
-
         self.text_transform = tokenizer.tokenize       
-        
-        
+
         # print(f'Constructing HTRDataModule with vocab {self.vocab}')
         print(f'VOCAB SIZE {self.vocab_size}')
 
-        # self.vocab_transform = self.encode
-        # self.text_transform = sequential_transforms(
-        #     # tokenize, # Tokenization (split into characters)
-        #     # # self.vocab_transform, # Numericalization (from chars to ints)
-        #     # tensor_transform # Add BOS/EOS and create tensor of ints
-        # )
         self.text_transform = tokenizer.prepare_text
 
         self.save_hyperparameters(logger=False)
@@ -353,25 +314,8 @@ class HTRDataModule(pl.LightningDataModule):
         
     def prepare_data(self):
         # download, split, tokenize, etc...
-        # Prepare dataset
         pass
-        # if 'saint-gall' in self.train_config.datasets.keys() \
-        #     or 'saint-gall' in self.val_config.datasets.keys() \
-        #     or 'saint-gall' in self.test_config.datasets.keys():
-        #     prepare_saint_gall(data_dir=self.train_config.data_dir)
-        # if 'esposalles' in self.train_config.datasets.keys() \
-        #     or 'esposalles' in self.val_config.datasets.keys() \
-        #     or 'esposalles' in self.test_config.datasets.keys():
-        #     prepare_esposalles(data_dir=self.train_config.data_dir)
-        # if self.dataset == "saint-gall":
-        #   prepare_saint_gall(data_dir=self.data_dir)
-        # elif self.dataset == "esposalles":
-        #   prepare_esposalles(data_dir=self.data_dir)
-        # elif self.dataset == "synth":
-        #     pass
-        # else:
-        #     pass
-
+       
     def setup(self, stage: str):
         print(f'Print train_config transforms: {self.train_config.transforms[0]}')
         self.stage = stage
