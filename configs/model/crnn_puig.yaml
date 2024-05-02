@@ -2,6 +2,7 @@ _target_: src.models.crnn_ctc_module.CRNN_CTC_Module
 # Accessing to data in configs/train_htr.yaml
 datasets: ${data}
 _logger: ${logger}
+tokenizer: ${tokenizer}
 
 
 optimizer:
@@ -22,6 +23,10 @@ net:
   input_size: 1280 
   hidden_size: 256
   num_layers: 5
-  vocab_size: 101
+  # vocab_size: 101
+  # vocab_size: ${tokenizer.vocab_size}
+  # Infer vocab size from tokenizer
+  # vocab_size: ${tokenizer.vocab_size()}
+  tokenizer: ${tokenizer}
 
 compile: false
