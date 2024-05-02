@@ -119,6 +119,26 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
     return callbacks
 
 
+def instantiate_tokenizers(tokenizer_cfg: DictConfig) -> LightningDataModule:
+    """Instantiates tokenizer from config.
+
+    :param tokenizer_cfg: A DictConfig object containing tokenizer configurations.
+    :return: An instantiated tokenizer.
+    """
+    if not tokenizer_cfg:
+        log.warning("No tokenizer config found! Skipping...")
+        return tokenizer_cfg
+
+    if not isinstance(tokenizer_cfg, DictConfig):
+        raise TypeError("Tokenizer config must be a DictConfig!")
+
+    print(f"TOKENIZER CFG: {tokenizer_cfg}")
+    print(f"TOKENIZER CFG KEYS: {tokenizer_cfg.keys()}")
+
+    log.info(f"Instantiating tokenizer <{tokenizer_cfg._target_}>")
+    return hydra.utils.instantiate(tokenizer_cfg)
+
+
 def instantiate_loggers(logger_cfg: DictConfig) -> List[Logger]:
     """Instantiates loggers from config.
 
