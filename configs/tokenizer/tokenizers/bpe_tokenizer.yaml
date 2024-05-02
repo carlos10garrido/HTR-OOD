@@ -1,0 +1,4 @@
+_target_: src.data.components.tokenizers.BPETokenizer
+model_name: "bpe_tokenizer"
+# vocab_size: 101
+path_checkpoint: ${paths.checkpoints_tokenizers}/wit-en-unidecoded.json

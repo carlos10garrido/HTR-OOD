@@ -1,0 +1,4 @@
+_target_: src.data.components.tokenizers.CharTokenizer
+model_name: "char_tokenizer"
+# vocab_size: 101
+vocab_file: ${paths.data_dir}/vocab.txt
