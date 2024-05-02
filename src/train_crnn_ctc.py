@@ -34,7 +34,7 @@ from src.utils import (
     task_wrapper,
 )
 
-from src.utils.instantiators import instantiate_data_configs 
+from src.utils.instantiators import instantiate_data_configs, instantiate_tokenizers
 
 log = RankedLogger(__name__, rank_zero_only=True)
 
@@ -61,7 +61,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     logger[0].experiment.config.update(
         OmegaConf.to_object(cfg.get("data").get("train"))
     )
-        # cfg.get("data").get("train"))
+
+    # Instantiating tokenizer
+    tokenizer = instantiate_tokenizers(cfg.get("tokenizer"))
+
+    print(f'TOKENIZER: {tokenizer}')
+    
 
     # Init data module
     log.info("Instantiating DataModule...")
@@ -69,6 +74,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         train_config=data_configs["train"],
         val_config=data_configs["val"],
         test_config=data_configs["test"],
+        tokenizer=tokenizer,
         seed=cfg.get("seed"),
     )
     log.info(f'DATAMODULE INSTANTIATED: {datamodule}')
