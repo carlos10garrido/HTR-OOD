@@ -29,14 +29,14 @@ net:
   image_size: ${data.train.train_config.img_size}
   encoder_layers: 4
   encoder_attention_heads: 8
-  encoder_ffn_dim: 512
+  encoder_ffn_dim: 1024
   patch_size: 1
   # vocab_size: 101
   d_model: 1024
   dropout: 0.1
   decoder_layers: 4
   decoder_attention_heads: 8
-  decoder_ffn_dim: 512
+  decoder_ffn_dim: 1024
   activation_function: 'relu'
   tokenizer: ${tokenizer}
 
