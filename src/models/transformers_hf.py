@@ -13,6 +13,7 @@ import os
 import src
 # import global variables encode and decode from htr_data_module.py
 # from src.data.htr_datamodule import encode, decode
+from src.data.components.tokenizers import Tokenizer
 
 import numpy as np
 # import cv2
@@ -34,6 +35,7 @@ class HTRTransformerLitModule(LightningModule):
         compile: bool,
         _logger: Any,
         datasets: dict,
+        tokenizer: Tokenizer,
     ) -> None:
         """Initialize a `HTRTransformerLitModule`.
 
@@ -62,8 +64,8 @@ class HTRTransformerLitModule(LightningModule):
         self.val_cer_minus = CER()
         self.test_cer_minus = CER()
         self.net = net
-        self.encode = src.data.htr_datamodule.encode
-        self.decode = src.data.htr_datamodule.decode
+        self.tokenizer = tokenizer
+        self.decode = self.tokenizer.detokenize
 
         # loss function
         self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-100) # 1 is the padding token
@@ -77,6 +79,26 @@ class HTRTransformerLitModule(LightningModule):
           'train_datasets': self.train_datasets,
           'val_datasets': self.val_datasets,
           'test_datasets': self.test_datasets,
+        })
+
+        self.metric_logger = MetricLogger(
+          logger=self._logger,
+          train_datasets=self.train_datasets,
+          val_datasets=self.val_datasets,
+          test_datasets=self.test_datasets,
+        )
+
+        self.metric_logger_minusc = MetricLogger(
+          logger=self._logger,
+          # Append minusc to val_datasets and test_datasets
+          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
+          val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
+          test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
+        )
+
+        # Log vocab size from net
+        self._logger.log_hyperparams({
+          'vocab_size': self.net.config.vocab_size,
         })
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -94,20 +116,20 @@ class HTRTransformerLitModule(LightningModule):
         # self.val_loss.reset()
         # Reset metrics for each dataset
 
-        self.metric_logger = MetricLogger(
-          logger=self._logger,
-          train_datasets=self.train_datasets,
-          val_datasets=self.val_datasets,
-          test_datasets=self.test_datasets,
-        )
+        # self.metric_logger = MetricLogger(
+        #   logger=self._logger,
+        #   train_datasets=self.train_datasets,
+        #   val_datasets=self.val_datasets,
+        #   test_datasets=self.test_datasets,
+        # )
 
-        self.metric_logger_minusc = MetricLogger(
-          logger=self._logger,
-          # Append minusc to val_datasets and test_datasets
-          train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
-          val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
-          test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
-        )
+        # self.metric_logger_minusc = MetricLogger(
+        #   logger=self._logger,
+        #   # Append minusc to val_datasets and test_datasets
+        #   train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
+        #   val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
+        #   test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
+        # )
 
     def decode_text(self, text, vocab_size):
         """Decode the text from the vocabulary."""
@@ -144,9 +166,15 @@ class HTRTransformerLitModule(LightningModule):
           self.metric_logger.log_images(images, str_train_datasets)
 
         labels = batch[1].permute(1, 0)
-        # labels[labels == 1] = -100
+        # Print 10 labels
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
         labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+
+        # Change labels where 1 to -100
+        labels[labels == self.tokenizer.pad_id] = -100
+        # print(f'labels[:4]: {labels[:4]}')
+        
+
 
         # breakpoint()
         outputs = self.net(images=images, labels=labels)
@@ -159,23 +187,32 @@ class HTRTransformerLitModule(LightningModule):
           logits = outputs
           loss = self.criterion(logits.view(-1, logits.shape[-1]), labels.view(-1))
 
+        # Print 10 logits argmaxed
+        # print(f'logits[:4]: {logits[:4].argmax(dim=-1)}')
+
+        # print(f'logits.shape: {logits.shape}')
+        # # Print argmax of logits for the first 5 examples
+        # print(f'logits[:5].argmax(dim=-1): {logits[:5].argmax(dim=-1)}')
+        # # Print labels for the first 10 examples
+        # print(f'labels[:5]: {labels[:10]}')
+
         
         # print(f'loss: {loss}')
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
 
         if batch_idx < 10:
-          print(f'Generating training images...')
           for i in range(images.shape[0]):
             # images_ = self.metric_logger.log_images(images[i], f'train/training_images_{self.train_datasets[0]}')
-            images_ = images[i]
+            # images_ = images[i]
+            images_ = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
             _label = labels[i].detach().cpu().numpy().tolist()
-            _label = [label if label != -100 else 1 for label in _label]
+            _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
             _pred = logits[i].argmax(-1).detach().cpu().numpy().tolist()
-            _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
-            print(f'Label: {_label}. Pred: {_pred}')
+            _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
+            # print(f'Label: {_label}. Pred: {_pred}')
             cer = CER()(_pred, _label)
-            self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+            # self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
         # update and log metrics
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
@@ -185,10 +222,12 @@ class HTRTransformerLitModule(LightningModule):
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         self.metric_logger.log_train_metrics()
-        self.metric_logger.update_epoch(self.current_epoch)
-        self.metric_logger_minusc.update_epoch(self.current_epoch)
+        # self.metric_logger.update_epoch(self.current_epoch)
+        # self.metric_logger_minusc.update_epoch(self.current_epoch)
 
         pass
+
+    
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
         """Perform a single validation step on a batch of data from the validation set.
@@ -207,15 +246,23 @@ class HTRTransformerLitModule(LightningModule):
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
+        # print(f'Labels val')
+        # print(f'labels[:4]: {labels[:4]}')
 
         total_cer_per_batch = 0.0
 
         if self.current_epoch == 0 and self.global_step <= 1:
           str_train_datasets = f'val_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
+
+        # breakpoint()
         
         preds = self.net.predict_greedy(images).sequences
+        # print(f'Preds val. Shape: {preds.shape}')
+        # print(f'preds[:4]: {preds[:4]}')
+
         preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
+        
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -224,8 +271,8 @@ class HTRTransformerLitModule(LightningModule):
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()
 
-          _label = [label if label != -100 else 1 for label in _label]
-          _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
+          _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
+          _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
           self.metric_logger.log_val_step_wer(_pred, _label, dataset)
@@ -238,13 +285,14 @@ class HTRTransformerLitModule(LightningModule):
           # print(f'VAL Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
-          if batch_idx < 20:
-            self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+          if batch_idx < 10:
+            print(f'VAL Label: {_label}. Pred: {_pred}')
+          #   self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
 
           total_cer_per_batch += cer
         
-        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
+        # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
 
 
@@ -279,6 +327,10 @@ class HTRTransformerLitModule(LightningModule):
           if isinstance(heldout_domain_cer, list):
             heldout_domain_cer = heldout_domain_cer[0].item()
           self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
+
+
+        self.metric_logger.update_epoch(self.current_epoch)
+        self.metric_logger_minusc.update_epoch(self.current_epoch)
 
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
@@ -317,8 +369,8 @@ class HTRTransformerLitModule(LightningModule):
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()
 
-          _label = [label if label != -100 else 1 for label in _label]
-          _label, _pred = self.decode_text(_label, self.net.vocab_size), self.decode_text(_pred, self.net.vocab_size)
+          _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
+          _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
           
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
