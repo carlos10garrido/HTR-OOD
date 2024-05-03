@@ -93,7 +93,8 @@ class TransformerKang(nn.Module):
         self.config = BartConfig(
             hidden_size=d_model,
             vocab_size=self.vocab_size,
-            intermediate_size=encoder_ffn_dim,
+            encoder_ffn_dim=encoder_ffn_dim,
+            decoder_ffn_dim=decoder_ffn_dim,
             hidden_dropout_prob=dropout,
             image_size=self.image_size,
             patch_size=patch_size,
@@ -108,7 +109,7 @@ class TransformerKang(nn.Module):
             dropout=dropout,
             attention_dropout=attention_dropout,
             activation_dropout=activation_dropout,
-            decoder_start_token_id=decoder_start_token_id,
+            decoder_start_token_id=self.tokenizer.bos_id,
             init_std=init_std,
             decoder_layerdrop=decoder_layerdrop,
             use_cache=use_cache,
@@ -123,10 +124,10 @@ class TransformerKang(nn.Module):
         self.config.max_length = max_length
         self.model = BartForConditionalGeneration(self.config)
         self.model.config.vocab_size = self.vocab_size
-        self.model.config.max_length = 100
-        # self.model.config.pad_token_id = 1
-        # self.model.config.bos_token_id = 0
-        # self.model.config.eos_token_id = 2
+        self.model.config.max_length = 150
+        self.model.config.pad_token_id = self.tokenizer.pad_id
+        self.model.config.bos_token_id = self.tokenizer.bos_id
+        self.model.config.eos_token_id = self.tokenizer.eos_id
         self.model.config.forced_eos_token_id = self.tokenizer.eos_id
         self.model.config.decoder_start_token_id = self.tokenizer.bos_id
 
@@ -184,10 +185,6 @@ class TransformerKang(nn.Module):
         outputs = self.model(inputs_embeds=x, decoder_input_ids=input_ids[:, :-1], # -1 for ignoring the last token
                           labels=labels, output_attentions=True, output_hidden_states=True)
 
-        # print(f'outputs: {outputs}')
-
-        # breakpoint()
-
         return outputs
         
     
@@ -220,9 +217,9 @@ class TransformerKang(nn.Module):
         return self.model.generate(
           inputs_embeds=x,
           return_dict_in_generate=True,
-          output_attentions=True,
-          output_hidden_states=True,
-          max_length=100,
+          output_attentions=False,
+          output_hidden_states=False,
+          max_length=150,
           decoder_start_token_id=self.tokenizer.bos_id,
           eos_token_id=self.tokenizer.eos_id,
           pad_token_id=self.tokenizer.pad_id,
