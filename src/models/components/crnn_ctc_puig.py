@@ -1,6 +1,9 @@
 import torch
 from torch import nn
 
+# import tokenizers
+from src.data.components.tokenizers import Tokenizer
+
 
 class CRNN_Puig(nn.Module):
   def __init__(
@@ -8,12 +11,11 @@ class CRNN_Puig(nn.Module):
         input_size: int,
         hidden_size: int,
         num_layers: int,
-        vocab_size: int,
+        # vocab_size: int,
+        tokenizer: Tokenizer
     ) -> None:
         """Initialize the model."""
         super().__init__()
-        self.proj_channels = nn.Conv2d(1, 3, kernel_size=1, stride=1, padding=0)
-
         # Original CRNN backbone (Puigcerver et al., 2017, ICDAR)
         self.backbone = torch.nn.Sequential(
           ### Block 1
@@ -44,7 +46,8 @@ class CRNN_Puig(nn.Module):
         )
 
         self.img_reduction = 8
-        self.vocab_size = vocab_size
+        # self.vocab_size = vocab_size
+        self.vocab_size = tokenizer.vocab_size
         self.hidden_size = hidden_size
 
         # Add bi-lstm for predicting char patches from segmentation
@@ -60,7 +63,7 @@ class CRNN_Puig(nn.Module):
         # Add linear layer for classification
         self.out  = torch.nn.Sequential(  
           nn.Dropout(0.5),
-          torch.nn.Linear(self.hidden_size*2, vocab_size+1) # +1 for CTC blank token
+          torch.nn.Linear(self.hidden_size*2, self.vocab_size+1) # +1 for CTC blank token
         )
 
   def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -68,10 +71,8 @@ class CRNN_Puig(nn.Module):
       :param x: The input tensor.
       :return: A tensor of predictions.
       """
-      # breakpoint()
-      # print(f'x.shape: {x.shape} IMAGES IN FORWARD')
+
       B, C, H, W = x.shape
-      x = self.proj_channels(x) if C == 1 else x
       x = self.backbone(x)
       # print(f'x.shape: {x.shape} after backbone')
       x = x.view(B, x.shape[1]*x.shape[2], x.shape[3]).permute(0, 2, 1)
