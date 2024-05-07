@@ -16,30 +16,7 @@ import cv2
 from unidecode import unidecode
 
 PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
-# 'pad_token_id': 1, bos_token_id': 0,  'eos_token_id': 2,
-# Old: ['<pad>', '<sos>', '<eos>', '<unk>']
-# 'bos_token_id': 0 'pad_token_id': 1 'eos_token_id': 2
-# New: ['<sos>', '<pad>','<eos>', '<unk>']
-# special_symbols = ['<pad>', '<sos>', '<eos>', '<unk>']
 
-# tokenize only separing per characters 
-# def tokenize(text):
-#     # return list(text)
-#     return list(unidecode(text))
-
-# # helper function to club together sequential operations
-# def sequential_transforms(*transforms):
-#     def func(txt_input):
-#         for transform in transforms:
-#             txt_input = transform(txt_input)
-#         return txt_input
-#     return func
-
-# # function to add BOS/EOS and create tensor for input sequence indices
-# def tensor_transform(token_ids: List[int]):
-#     return torch.cat((torch.tensor([SOS_IDX]),
-#                       torch.tensor(token_ids),
-#                       torch.tensor([EOS_IDX])))
 
 def read_htr_fonts(fonts_path):
   fonts = []
@@ -106,26 +83,30 @@ def generate_image(sequence, font, background_color=(255, 255, 255), text_color=
     img = Image.new("RGB", (img_size[0], img_size[1]), background_color)
     draw = ImageDraw.Draw(img)
     draw.text((img_size[1]//10, img_size[0]//4), txt, font=font, fill=text_color)
+    text_bbox = draw.textbbox((img_size[1]//10, img_size[0]//4), txt, font=font)
+    img = img.crop(text_bbox)
 
-    # Apply transformations here? (before cropping)
+    # TODO: check new way of cropping image!
 
-    # Crop image to fit the text
-    data = np.asarray(img)
-    data = np.mean(data, -1)
-    min_col = np.argmin(data, 0)
-    min_row = np.argmin(data, 1)
+    # # Apply transformations here? (before cropping)
 
-    first_col = np.nonzero(min_col)[0][0] - 1
-    last_col = np.nonzero(min_col)[0][-1] + 1
+    # # Crop image to fit the text
+    # data = np.asarray(img)
+    # data = np.mean(data, -1)
+    # min_col = np.argmin(data, 0)
+    # min_row = np.argmin(data, 1)
 
-    first_row = np.nonzero(min_row)[0][0] - 1
-    last_row = np.nonzero(min_row)[0][-1] + 1
+    # first_col = np.nonzero(min_col)[0][0] - 1
+    # last_col = np.nonzero(min_col)[0][-1] + 1
 
-    cropped_image = img.crop((first_col, first_row, last_col, last_row))
-    # Add padding to image with PIL
+    # first_row = np.nonzero(min_row)[0][0] - 1
+    # last_row = np.nonzero(min_row)[0][-1] + 1
 
-    # img = cropped_image.resize((256, 64))
-    img = cropped_image
+    # cropped_image = img.crop((first_col, first_row, last_col, last_row))
+    # # Add padding to image with PIL
+
+    # # img = cropped_image.resize((256, 64))
+    # img = cropped_image
 
     # Check if image shapes are zero
     assert img.size[0] != 0 and img.size[1] != 0, f'Image shape is zero. Image shape: {img.size}. Sequence: {sequence}'
@@ -503,3 +484,64 @@ class Binarization(object):
     _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     return image
+
+class Degradations(object):
+  def __init__(self, ink_colors: List[str], paths_backgrounds: str):
+    # Colors come in a list of #RRGGBB strings in hexadecimal
+    # conver to tuple of (R, G, B) for each color
+    self.colors = [tuple(int(color.lstrip("#")[i:i+2], 16) for i in (0, 2, 4)) for color in ink_colors]
+    self.paths_backgrounds = paths_backgrounds
+    # self.files_backgrounds = !find $paths_backgrounds -type f -name "*.png"
+    # Same function but in python with os without using bash
+    extensions = ['.png', '.jpg', '.jpeg']
+    self.files_backgrounds = [os.path.join(dp, f) for dp, dn, filenames in os.walk(paths_backgrounds) for f in filenames if os.path.splitext(f)[1] in extensions]
+    # print(f'Files {self.files_backgrounds}')
+
+  def __call__(self, image):
+    # Binarize with opencv to obtain a mask of the pixels
+    image_thres = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
+    _, mask = cv2.threshold(image_thres, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    ink_image = Image.new('RGB', image.size, color=self.colors[np.random.randint(0, len(self.colors))])
+    ink_image = ink_image.resize(image.size)
+    image = Image.composite(image, ink_image, Image.fromarray(mask))
+
+    background = cv2.imread(self.files_backgrounds[np.random.randint(0, len(self.files_backgrounds))])
+    background = cv2.cvtColor(background, cv2.COLOR_BGR2RGB) # Convert to RGB
+    # Apply median filter to remove text
+    background = cv2.medianBlur(background, 51)
+
+    # Convert to PIL
+    img_pil_background = Image.fromarray(background)
+    img_pil_background_resized = img_pil_background.resize(image.size)
+
+    # Composite image with background without pixels of the text (using mask)
+    # invert mask to composite the image with the background
+    image = Image.composite(img_pil_background_resized, image, Image.fromarray(mask))
+    
+    # print(f'Returning image with degradation')
+    return image
+    
+# class Background(object):
+#   def __init__(self, paths):
+#     self.paths = paths
+#     self.files = !find $paths -type f -name "*.png"
+#     # Same function but in python with os without using bash
+#     self.files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(paths) for f in filenames if os.path.splitext(f)[1] == '.png']
+#     print(f'Files {self.files}')
+
+#   def __call__(self, image):
+#     # Read image
+    
+    
+#     # Add text to image
+#     paths_fonts = !find ../data/synth/final_fonts_rendered -type f -name '*.ttf'
+#     font = np.random.choice(paths_fonts)
+#     print(f'Font: {font}')
+#     font = ImageFont.truetype(font, 50)
+#     txt = 'As he pointed out, "the world is round".'
+    
+#     text_color = (0, 0, 0)
+    
+    
+    
