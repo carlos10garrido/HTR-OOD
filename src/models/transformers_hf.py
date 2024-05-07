@@ -266,7 +266,7 @@ class HTRTransformerLitModule(LightningModule):
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
-          images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}')
+          images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
           _label = labels[i].detach().cpu().numpy().tolist()
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()
@@ -364,7 +364,7 @@ class HTRTransformerLitModule(LightningModule):
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
-          images_ = self.metric_logger.log_images(images[i], f'test/test_images_{dataset}')
+          # images_ = self.metric_logger.log_images(images[i], f'test/test_images_{dataset}') if batch_idx == 0 else None
           _label = labels[i].detach().cpu().numpy().tolist()
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()
@@ -375,7 +375,7 @@ class HTRTransformerLitModule(LightningModule):
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
           
-          if batch_idx < 20:
+          if batch_idx < 4:
             self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
           print(f'TEST Label: {_label}. Pred: {_pred}')
