@@ -16,6 +16,7 @@ import os
 import src
 import wandb
 import torchvision
+from src.data.components.tokenizers import Tokenizer
 
 class CRNN_CTC_Module(LightningModule):
     def __init__(
@@ -26,6 +27,7 @@ class CRNN_CTC_Module(LightningModule):
         compile: bool,
         _logger: Any,
         datasets: dict,
+        tokenizer: Tokenizer,
     ) -> None:
         """Initialize a `CRNN_CTC_Module`.
 
@@ -57,8 +59,8 @@ class CRNN_CTC_Module(LightningModule):
         self.val_cer_minus = CER()
         self.test_cer_minus = CER()
         self.net = net
-        self.encode = src.data.htr_datamodule.encode
-        self.decode = src.data.htr_datamodule.decode
+        self.tokenizer = tokenizer #tokenizer['tokenizers']
+        self.decode = self.tokenizer.detokenize
 
         # loss function for regressing the number of characters in an image
         self.criterion = torch.nn.CTCLoss(blank=self.net.vocab_size, zero_infinity=True, reduction='mean')
@@ -72,6 +74,11 @@ class CRNN_CTC_Module(LightningModule):
           'train_datasets': self.train_datasets,
           'val_datasets': self.val_datasets,
           'test_datasets': self.test_datasets,
+        })
+
+        # Log net.vocab_size
+        self._logger.log_hyperparams({
+          'vocab_size': self.net.vocab_size,
         })
 
         self.metric_logger = MetricLogger(
@@ -100,45 +107,7 @@ class CRNN_CTC_Module(LightningModule):
 
     def on_fit_start(self) -> None:
         """Lightning hook that is called when training begins."""
-        # by default lightning executes validation step sanity checks before training starts,
-        # so it's worth to make sure validation metrics don't store results from these checks
-        # self.val_loss.reset()
-        # Reset metrics for each dataset
-
-        # self.metric_logger = MetricLogger(
-        #   logger=self._logger,
-        #   train_datasets=self.train_datasets,
-        #   val_datasets=self.val_datasets,
-        #   test_datasets=self.test_datasets,
-        # )
-
-        # self.metric_logger_minusc = MetricLogger(
-        #   logger=self._logger,
-        #   # Append minusc to val_datasets and test_datasets
-        #   train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
-        #   val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
-        #   test_datasets=[f'{test_dataset}_minusc' for test_dataset in self.test_datasets],
-        # )
         
-    def decode_text(self, text, vocab_size):
-        """Decode the text from the vocabulary."""
-
-        # Check if it is a tensor or a list
-        if isinstance(text, torch.Tensor):
-            text = text.tolist()
-        else:
-            text = text
-
-        text = self.decode(text)
-        
-        # Remove the <sos> and <eos> tokens
-        _text = ""
-        for i in range(len(text)):
-          if text[i] == '<eos>' or text[i] == '<sos>' or text[i] == '<pad>':
-            break
-          _text += text[i]
-
-        return _text
 
     def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set.
@@ -157,7 +126,7 @@ class CRNN_CTC_Module(LightningModule):
 
         y = batch[1].permute(1, 0)
         labels = y[:, 1:].clone().contiguous() # Shift all labels to the right
-        target_lengths = torch.where(labels == 2)[1]
+        target_lengths = torch.where(labels == self.tokenizer.eos_id)[1]
         labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         # Calculate for CTC the length of the sequence
@@ -171,19 +140,23 @@ class CRNN_CTC_Module(LightningModule):
         preds_ = preds.clone().permute(1, 0, 2).argmax(-1)
 
         # Log images and predictions
-        if batch_idx < 10:
+        if batch_idx < 1:
           for i in range(images.shape[0]):
             _label = labels[i].detach().cpu().numpy().tolist()
             # Remove consecutive repeated tokens
             _pred = torch.unique_consecutive(preds_[i].detach()).cpu().numpy().tolist()
             _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token            
-            _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
+            _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
             cer = CER()(_pred, _label)
 
             # Log training image and predictions
+            orig_image = torchvision.utils.make_grid(images[i].detach().cpu(), nrow=1, normalize=True)
             orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
             self._logger.experiment.log({f'train/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+
+            # Write image on disk to check if it is correct
+            # orig_image.save(f'./outputs/train_image_{batch_idx}_{i}.png')
 
         self.metric_logger.log_train_step(loss, torch.tensor([0.0]))
 
@@ -195,8 +168,8 @@ class CRNN_CTC_Module(LightningModule):
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         self.metric_logger.log_train_metrics()
-        self.metric_logger.update_epoch(self.current_epoch)
-        self.metric_logger_minusc.update_epoch(self.current_epoch)
+        # self.metric_logger.update_epoch(self.current_epoch)
+        # self.metric_logger_minusc.update_epoch(self.current_epoch)
         self.train_cer_epoch = self.train_cer.compute()
 
         self.log("train/cer_epoch", self.train_cer_epoch, on_epoch=True, prog_bar=True)
@@ -222,9 +195,10 @@ class CRNN_CTC_Module(LightningModule):
           _pred = torch.unique_consecutive(preds[i].detach()).cpu().numpy().tolist()
           _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token
           
-          _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
+          # _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
+          _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
-          # print(f'Label: {_label} - Pred: {_pred}')
+          print(f'Label: {_label} - Pred: {_pred}')
 
           # Calculate CER converting mayus to minus
           _label_minus = _label.lower()
@@ -235,9 +209,9 @@ class CRNN_CTC_Module(LightningModule):
 
           # Calculate CER
           cer = CER()(_pred, _label)
-          # if batch_idx < 15:
-          #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-          #   self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
+          if batch_idx < 1:
+            orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+            self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
 
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
@@ -303,7 +277,7 @@ class CRNN_CTC_Module(LightningModule):
         _pred = torch.unique_consecutive(preds[i].detach()).cpu().numpy().tolist()
         _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token
 
-        _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
+        _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
         # print(f'Label: {_label} - Pred: {_pred}')
 
@@ -315,7 +289,7 @@ class CRNN_CTC_Module(LightningModule):
 
         # Calculate CER
         cer = CER()(_pred, _label)
-        if batch_idx < 2:
+        if batch_idx < 1:
           orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
           # self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(image_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
           self._logger.experiment.log({f'test/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
@@ -356,6 +330,9 @@ class CRNN_CTC_Module(LightningModule):
         # self.log(f'test/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
         # self.log(f'test/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
         # self.log(f'test/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+
+        self.metric_logger.update_epoch(self.current_epoch)
+        self.metric_logger_minusc.update_epoch(self.current_epoch)
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
