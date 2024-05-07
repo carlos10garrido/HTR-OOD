@@ -147,6 +147,19 @@ class HTRDatasetSynth(Dataset):
     
       return sequence
 
+    def select_printable_font(self, sequence):
+        font = np.random.choice(self.fonts)
+        can_generate = False
+        while can_generate is False:
+            for c in sequence:
+                if has_glyph(font, str(c)) is False:
+                    font = np.random.choice(self.fonts)
+                    # print(f'Selecting another font for generating {sequence}!. Cannot generate {c}')
+                    break
+            can_generate = True
+
+        return font
+
     def __getitem__(self, idx):
         # Get sequence and read image
         sequence = self.sequences[idx] # Generate other sequence if len(sequence) == 0:
@@ -165,16 +178,23 @@ class HTRDatasetSynth(Dataset):
 
             # print(f'Sequence too long. Selecting window of 50 characters: {sequence}')
         
-        # font = np.random.choice(self.fonts)
-        font = select_printable_font(sequence, self.fonts)
+        font = np.random.choice(self.fonts)
+        # font = self.select_printable_font(sequence)
         generated = False # Flag to check if image is generated correctly, if not, generate again
 
         # text_color = tuple(np.random.randint(0, 256, size=(1,)))
         # text_color = (text_color[0], text_color[0], text_color[0])
         # background_colors = tuple(np.random.randint(180, 256, size=(1,)))
         # background_colors = (background_colors[0], background_colors[0], background_colors[0])
+        # text_color = (0,0,0)
+        # brown = (165, 42, 42)
         text_color = (0,0,0)
+        # grey background color = (192, 192, 192)
         background_colors = (255,255,255)
+        # background_colors = (114, 114, 114)
+
+
+        # print(f'Generating image with sequence {sequence} and font {font}')
 
         while not generated:
             try:
@@ -185,7 +205,7 @@ class HTRDatasetSynth(Dataset):
 
                 generated = True
             except Exception as e:
-                # print(f'Exception {e} while generating image with sequence {sequence} and font {font}.')
+                print(f'Exception {e} while generating image with sequence {sequence} and font {font}.')
                 sequence = np.random.choice(self.sequences)
                 sequence = sequence.replace("\n", "")
                 sequence = unidecode(sequence)
@@ -194,21 +214,24 @@ class HTRDatasetSynth(Dataset):
 
                 font = np.random.choice(self.fonts)
 
+        # image = generate_image(sequence, font, background_colors, text_color)
+        # image = self.transform(image)
+
 
         # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
 
-        # Binarize image using Opencv
-        if len(image.shape) == 3:
-          # Convert to numpy array
-          # image = image.permute(1, 2, 0).numpy()
-          # print(f'Image shape: {image.shape}')
-          # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-          # Binarize image with opencv Otsu algorithm
-          # _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-          # Convert to grayscale image using torchvision
-          image = torchvision.transforms.Grayscale()(image)
+        # # Binarize image using Opencv
+        # if len(image.shape) == 3:
+        #   # Convert to numpy array
+        #   # image = image.permute(1, 2, 0).numpy()
+        #   # print(f'Image shape: {image.shape}')
+        #   # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        #   # Binarize image with opencv Otsu algorithm
+        #   # _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        #   # Convert to grayscale image using torchvision
+        #   image = torchvision.transforms.Grayscale()(image)
 
-
+        # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
                 
         return image, sequence
 
@@ -252,11 +275,9 @@ class HTRDataset(Dataset):
 
         # Read image with opencv
         image = cv2.imread(self.paths_images[idx])
-
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) 
 
         # Write image on outputs/ folder to check if image is read correctly
-        cv2.imwrite(f'outputs/train_{self.paths_images[idx].split("/")[-1]}', image)
 
         if self.binarize:  
           # Convert to grayscale if image is not grayscale
@@ -269,7 +290,7 @@ class HTRDataset(Dataset):
         image = Image.fromarray(image)
 
         # Write image on disk to check if image is read correctly
-        image.save(f'outputs/train_np_array{self.paths_images[idx].split("/")[-1]}')
+        # image.save(f'outputs/train_np_array{self.paths_images[idx].split("/")[-1]}')
 
 
 
@@ -384,7 +405,6 @@ class HTRDataModule(pl.LightningDataModule):
 
                   # self.__setattr__(_stage + "_sampler", ds.stage_sampler)
                   # print(f'Sampler {self.__getattribute__(_stage + "_sampler")} added to datamodule as {self.__getattribute__(_stage + "_sampler")} for stage {_stage}')
-
                   htr_dataset = HTRDatasetSynth(sequences, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
               
               # TODO: REVIEW THIS VOCABULARY
