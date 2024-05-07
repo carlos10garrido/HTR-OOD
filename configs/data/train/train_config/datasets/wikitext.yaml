@@ -1,7 +1,7 @@
 wikitext:
   _target_: src.data.data_config.SynthDatasetConfig
   name: synth_wikitext
-  words_path: ${paths.data_dir}/synth/wikitext2_unif.json
+  words_path: ${paths.data_dir}/synth/wikitext/wikitext-2-raw-v1.txt
   # fonts_path: ${paths.data_dir}/synth/handwritten-fonts/
   fonts_path: ${paths.data_dir}/synth/final_fonts_rendered/
   distr: False 
