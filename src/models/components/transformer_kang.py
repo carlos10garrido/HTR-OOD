@@ -10,6 +10,11 @@ from transformers import (
     BartTokenizer,
     BartConfig,
     BartModel,
+    BertConfig,
+    GenerationConfig,
+    EncoderDecoderModel,
+    EncoderDecoderConfig,
+    RobertaPreLayerNormConfig,
 )
 
 from src.data.components.tokenizers import Tokenizer
@@ -22,8 +27,7 @@ class TransformerKang(nn.Module):
         image_size: tuple = (32, 100),
         use_backbone: bool = True,
         patch_per_column: bool = True,
-        patch_size: int = 4,
-        vocab_size: int = 0,
+        vocab_size: int = 99,
         max_position_embeddings: int = 1024,
         encoder_layers: int = 4,
         encoder_ffn_dim: int = 1024,
@@ -39,12 +43,12 @@ class TransformerKang(nn.Module):
         attention_dropout: float = 0.1,
         activation_dropout: float = 0.1,
         init_std: float = 0.02,
-        scale_embedding: bool = False,
         use_cache: bool = True,
-        max_length: int = 100,
+        max_length: int = 150,
         pad_token_id: int = 1,
         bos_token_id: int = 0,
         eos_token_id: int = 2,
+        position_embedding_type: str = "absolute",
         is_encoder_decoder: bool = True,
         decoder_start_token_id: int = 0,
         forced_eos_token_id: int = 2,
@@ -56,8 +60,8 @@ class TransformerKang(nn.Module):
         self.use_backbone = use_backbone
         self.patch_per_column = patch_per_column
         self.image_size = image_size
-        self.vocab_size = tokenizer.vocab_size
         self.tokenizer = tokenizer
+        self.vocab_size = tokenizer.vocab_size        
 
         if self.use_backbone:
             self.num_channels = 2048 * (image_size[0] // 16) if self.patch_per_column else 2048
@@ -77,10 +81,17 @@ class TransformerKang(nn.Module):
 
           # Unmodify 
           # Change stride of last layer (2,2) to (1,1)
+
+          # breakpoint()
+          # Resnet 50 modification
           self.backbone.layer4[0].downsample[0].stride = (1,1)
           self.backbone.layer4[0].conv2.stride = (1,1)
 
+          # Resnet 34 modification
+          # self.backbone.layer4[0].conv1.stride=(1,1)
+          # self.backbone.layer4[0].downsample[0].stride=(1,1)
 
+        
           self.backbone = torch.nn.Sequential(
               *list(self.backbone.children())[:-2], # Remove last 4 layers
               # torch.nn.Conv2d(128, d_model, kernel_size=1, stride=1, padding=0, bias=False),
@@ -90,39 +101,113 @@ class TransformerKang(nn.Module):
 
         self.lin_proj = nn.Linear(self.num_channels, d_model)
 
-        self.config = BartConfig(
-            hidden_size=d_model,
-            vocab_size=self.vocab_size,
-            encoder_ffn_dim=encoder_ffn_dim,
-            decoder_ffn_dim=decoder_ffn_dim,
-            hidden_dropout_prob=dropout,
-            image_size=self.image_size,
-            patch_size=patch_size,
-            d_model=d_model,
-            encoder_layers=encoder_layers,
-            decoder_layers=decoder_layers,
-            num_hidden_layers=encoder_layers,
-            num_attention_heads=encoder_attention_heads,
-            decoder_attention_heads=decoder_attention_heads,
-            activation_function=activation_function,
-            max_position_embeddings=max_position_embeddings,
-            dropout=dropout,
-            attention_dropout=attention_dropout,
-            activation_dropout=activation_dropout,
-            decoder_start_token_id=self.tokenizer.bos_id,
-            init_std=init_std,
-            decoder_layerdrop=decoder_layerdrop,
-            use_cache=use_cache,
-            scale_embedding=scale_embedding,
-            pad_token_id=self.tokenizer.pad_id,
-            bos_token_id=self.tokenizer.bos_id,
-            eos_token_id=self.tokenizer.eos_id
+        # self.config = BartConfig(
+        #     hidden_size=d_model,
+        #     vocab_size=self.vocab_size,
+        #     encoder_ffn_dim=encoder_ffn_dim,
+        #     decoder_ffn_dim=decoder_ffn_dim,
+        #     hidden_dropout_prob=dropout,
+        #     image_size=self.image_size,
+        #     d_model=d_model,
+        #     encoder_layers=encoder_layers,
+        #     decoder_layers=decoder_layers,
+        #     num_hidden_layers=encoder_layers,
+        #     num_attention_heads=encoder_attention_heads,
+        #     decoder_attention_heads=decoder_attention_heads,
+        #     activation_function=activation_function,
+        #     max_position_embeddings=max_position_embeddings,
+        #     dropout=dropout,
+        #     attention_dropout=attention_dropout,
+        #     activation_dropout=activation_dropout,
+        #     decoder_start_token_id=self.tokenizer.bos_id,
+        #     init_std=init_std,
+        #     decoder_layerdrop=decoder_layerdrop,
+        #     use_cache=use_cache,
+        #     pad_token_id=self.tokenizer.pad_id,
+        #     bos_token_id=self.tokenizer.bos_id,
+        #     eos_token_id=self.tokenizer.eos_id
+        # )
+
+        # Create encoder config with RobertaPreLayerNormConfig
+        # self.encoder_config = RobertaPreLayerNormConfig(
+        #     hidden_size=d_model,
+        #     vocab_size=self.vocab_size,
+        #     encoder_ffn_dim=encoder_ffn_dim,
+        #     hidden_dropout_prob=dropout,
+        #     image_size=self.image_size,
+        #     d_model=d_model,
+        #     encoder_layers=encoder_layers,
+        #     num_hidden_layers=encoder_layers,
+        #     num_attention_heads=encoder_attention_heads,
+        #     activation_function=activation_function,
+        #     max_position_embeddings=max_position_embeddings,
+        #     hidden_dropout_prob=dropout,
+        #     classifier_dropout=dropout,
+        #     attention_dropout=attention_dropout,
+        #     activation_dropout=activation_dropout,
+        #     init_std=init_std,
+        #     decoder_layerdrop=decoder_layerdrop,
+        #     use_cache=use_cache,
+        #     position_embedding_type=position_embedding_type,
+        #     pad_token_id=self.tokenizer.pad_id,
+        #     bos_token_id=self.tokenizer.bos_id,
+        #     eos_token_id=self.tokenizer.eos_id
+        #     is_decoder=False
+        #     type_vocab_size=1,
+        # )
+
+        self.encoder_config = BertConfig(
+          vocab_size = tokenizer.vocab_size,
+          hidden_size = d_model,
+          num_hidden_layers = encoder_layers,
+          num_attention_heads = encoder_attention_heads,
+          intermediate_size =  encoder_ffn_dim,
+          hidden_act = 'gelu',
+          hidden_dropout_prob = dropout,
+          attention_probs_dropout_prob = 0.0,
+          max_position_embeddings = 512,
+          type_vocab_size = 2,
+          initializer_range = 0.02,
+          layer_norm_eps = 1e-12,
+          pad_token_id = tokenizer.pad_id,
+          bos_token_id = tokenizer.bos_id,
+          eos_token_id = tokenizer.eos_id,
+          position_embedding_type = 'absolute',
+          use_cache = True,
+          classifier_dropout =dropout,
+          is_decoder=False
         )
 
-        print(f'CONFIG: {self.config}')
+        self.decoder_config = BertConfig(
+          vocab_size = tokenizer.vocab_size,
+          hidden_size = d_model,
+          num_hidden_layers = decoder_layers,
+          num_attention_heads = decoder_attention_heads,
+          intermediate_size =  decoder_ffn_dim,
+          hidden_act = 'gelu',
+          hidden_dropout_prob = dropout,
+          attention_probs_dropout_prob = 0.0,
+          max_position_embeddings = 512,
+          type_vocab_size = 2,
+          initializer_range = 0.02,
+          layer_norm_eps = 1e-12,
+          pad_token_id = tokenizer.pad_id,
+          bos_token_id = tokenizer.bos_id,
+          eos_token_id = tokenizer.eos_id,
+          position_embedding_type = 'absolute',
+          use_cache = True,
+          classifier_dropout =dropout,
+          is_decoder=True
+        )
+
+        # breakpoint()
+        self.config = EncoderDecoderConfig.from_encoder_decoder_configs(self.encoder_config, self.decoder_config)
+        self.model = EncoderDecoderModel(config=self.config)
+        # print(f'CONFIG: {self.config}')
+
         
         self.config.max_length = max_length
-        self.model = BartForConditionalGeneration(self.config)
+        # self.model = BartForConditionalGeneration(self.config)
         self.model.config.vocab_size = self.vocab_size
         self.model.config.max_length = 150
         self.model.config.pad_token_id = self.tokenizer.pad_id
@@ -130,8 +215,24 @@ class TransformerKang(nn.Module):
         self.model.config.eos_token_id = self.tokenizer.eos_id
         self.model.config.forced_eos_token_id = self.tokenizer.eos_id
         self.model.config.decoder_start_token_id = self.tokenizer.bos_id
+        self.model.config.is_encoder_decoder = True
+
+        # Generation config
+        generation_config = GenerationConfig(
+            max_length=150,
+            pad_token_id=self.tokenizer.pad_id,
+            bos_token_id=self.tokenizer.bos_id,
+            eos_token_id=self.tokenizer.eos_id,
+            forced_eos_token_id=self.tokenizer.eos_id,
+            min_p=0.02
+        )
+
+        self.model.generation_config = generation_config
+
+
 
         print(f'MODEL: {self.model}')
+        print(f'Generation Config: {self.model.generation_config}')
 
         # # Delete bart encoder shared and embed tokens
         # del self.model.get_encoder().shared
@@ -180,7 +281,6 @@ class TransformerKang(nn.Module):
         input_ids[input_ids == -100] = self.model.config.pad_token_id
         # Add bos to input_ids
         input_ids = torch.cat([torch.ones(input_ids.shape[0], 1, dtype=torch.int).to(self.model.device) * self.model.config.bos_token_id, input_ids], dim=-1)
-
           
         outputs = self.model(inputs_embeds=x, decoder_input_ids=input_ids[:, :-1], # -1 for ignoring the last token
                           labels=labels, output_attentions=True, output_hidden_states=True)
@@ -213,19 +313,19 @@ class TransformerKang(nn.Module):
         x = self.lin_proj(x)
         # print(f'x.shape: {x.shape} after lin_proj')
 
-        
+        # breakpoint()
         return self.model.generate(
           inputs_embeds=x,
           return_dict_in_generate=True,
-          output_attentions=False,
-          output_hidden_states=False,
-          max_length=150,
+          output_attentions=True,
+          output_hidden_states=True,
+          max_new_tokens=120,
           decoder_start_token_id=self.tokenizer.bos_id,
           eos_token_id=self.tokenizer.eos_id,
           pad_token_id=self.tokenizer.pad_id,
           forced_eos_token_id=self.tokenizer.eos_id
         )
-
+  
 
 if __name__ == "__main__":
     _ = TransformerOCR()
