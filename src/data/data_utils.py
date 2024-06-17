@@ -86,28 +86,6 @@ def generate_image(sequence, font, background_color=(255, 255, 255), text_color=
     text_bbox = draw.textbbox((img_size[1]//10, img_size[0]//4), txt, font=font)
     img = img.crop(text_bbox)
 
-    # TODO: check new way of cropping image!
-
-    # # Apply transformations here? (before cropping)
-
-    # # Crop image to fit the text
-    # data = np.asarray(img)
-    # data = np.mean(data, -1)
-    # min_col = np.argmin(data, 0)
-    # min_row = np.argmin(data, 1)
-
-    # first_col = np.nonzero(min_col)[0][0] - 1
-    # last_col = np.nonzero(min_col)[0][-1] + 1
-
-    # first_row = np.nonzero(min_row)[0][0] - 1
-    # last_row = np.nonzero(min_row)[0][-1] + 1
-
-    # cropped_image = img.crop((first_col, first_row, last_col, last_row))
-    # # Add padding to image with PIL
-
-    # # img = cropped_image.resize((256, 64))
-    # img = cropped_image
-
     # Check if image shapes are zero
     assert img.size[0] != 0 and img.size[1] != 0, f'Image shape is zero. Image shape: {img.size}. Sequence: {sequence}'
 
