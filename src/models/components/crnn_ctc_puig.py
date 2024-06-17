@@ -4,7 +4,6 @@ from torch import nn
 # import tokenizers
 from src.data.components.tokenizers import Tokenizer
 
-
 class CRNN_Puig(nn.Module):
   def __init__(
         self,
@@ -45,8 +44,7 @@ class CRNN_Puig(nn.Module):
           nn.Dropout2d(0.2),
         )
 
-        self.img_reduction = 8
-        # self.vocab_size = vocab_size
+        self.img_reduction = (32, 8)
         self.vocab_size = tokenizer.vocab_size
         self.hidden_size = hidden_size
 
