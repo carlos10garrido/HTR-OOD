@@ -19,14 +19,10 @@ import numpy as np
 # import cv2
 from PIL import Image
 import wandb
-import matplotlib
-cmap = matplotlib.cm.get_cmap('jet')
-cmap.set_bad(color="k", alpha=0.0)
 
 # PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
 
 class HTRTransformerLitModule(LightningModule):
-  
     def __init__(
         self,
         net: torch.nn.Module,
@@ -68,7 +64,8 @@ class HTRTransformerLitModule(LightningModule):
         self.decode = self.tokenizer.detokenize
 
         # loss function
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-100) # 1 is the padding token
+        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-100) # 1 is the padding token
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id, label_smoothing=0.4) # 1 is the padding token
 
         # metric objects for calculating and averaging accuracy across batches
         log.info(f'Logger in HTRTransformerLitModule: {_logger}. Keys: {list(_logger.keys())}')
@@ -98,7 +95,7 @@ class HTRTransformerLitModule(LightningModule):
 
         # Log vocab size from net
         self._logger.log_hyperparams({
-          'vocab_size': self.net.config.vocab_size,
+          'vocab_size': self.net.vocab_size,
         })
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -168,40 +165,30 @@ class HTRTransformerLitModule(LightningModule):
         labels = batch[1].permute(1, 0)
         # Print 10 labels
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         # Change labels where 1 to -100
-        labels[labels == self.tokenizer.pad_id] = -100
+        # labels[labels == self.tokenizer.pad_id] = -100
         # print(f'labels[:4]: {labels[:4]}')
-        
-
-
         # breakpoint()
         outputs = self.net(images=images, labels=labels)
+
 
         # Check if outputs is an instance of Hugging Face ModelOutput
         if hasattr(outputs, 'logits'):
           logits = outputs.logits
-          loss = outputs.loss
+          # loss = outputs.loss
+          loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
         else:
-          logits = outputs
-          loss = self.criterion(logits.view(-1, logits.shape[-1]), labels.view(-1))
-
-        # Print 10 logits argmaxed
-        # print(f'logits[:4]: {logits[:4].argmax(dim=-1)}')
-
-        # print(f'logits.shape: {logits.shape}')
-        # # Print argmax of logits for the first 5 examples
-        # print(f'logits[:5].argmax(dim=-1): {logits[:5].argmax(dim=-1)}')
-        # # Print labels for the first 10 examples
-        # print(f'labels[:5]: {labels[:10]}')
-
+          logits = outputs[:, 1:]
+          loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
+        
         
         # print(f'loss: {loss}')
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
 
-        if batch_idx < 10:
+        if batch_idx < 2:
           for i in range(images.shape[0]):
             # images_ = self.metric_logger.log_images(images[i], f'train/training_images_{self.train_datasets[0]}')
             # images_ = images[i]
@@ -210,7 +197,7 @@ class HTRTransformerLitModule(LightningModule):
             _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
             _pred = logits[i].argmax(-1).detach().cpu().numpy().tolist()
             _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
-            # print(f'Label: {_label}. Pred: {_pred}')
+            print(f'Label: {_label}. Pred: {_pred}')
             cer = CER()(_pred, _label)
             # self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
@@ -255,7 +242,6 @@ class HTRTransformerLitModule(LightningModule):
           str_train_datasets = f'val_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
 
-        # breakpoint()
         
         preds = self.net.predict_greedy(images).sequences
         # print(f'Preds val. Shape: {preds.shape}')
@@ -285,9 +271,9 @@ class HTRTransformerLitModule(LightningModule):
           # print(f'VAL Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
-          if batch_idx < 10:
+          if batch_idx < 1:
             print(f'VAL Label: {_label}. Pred: {_pred}')
-          #   self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+            # self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
 
           total_cer_per_batch += cer
@@ -374,12 +360,12 @@ class HTRTransformerLitModule(LightningModule):
           
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
-          
-          if batch_idx < 4:
-            self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
           print(f'TEST Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
+          
+          if batch_idx < 1:
+            self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
           total_cer_per_batch += cer
         
@@ -416,11 +402,14 @@ class HTRTransformerLitModule(LightningModule):
         :return: A dict containing the configured optimizers and learning-rate schedulers to be used for training.
         """
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
+        self.optimizer = optimizer
         log.info(f'Optimizer: {optimizer}')
         # Number of parameters
         print(f'Number of parameters: {sum(p.numel() for p in self.parameters() if p.requires_grad)}')
         if self.hparams.scheduler is not None:
+            print(f'Using scheduler: {self.hparams.scheduler}')
             scheduler = self.hparams.scheduler(optimizer=optimizer)
+            self.scheduler = scheduler # Save scheduler to access it in other methods
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
