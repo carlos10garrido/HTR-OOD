@@ -21,6 +21,7 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.data.data_config import DatasetConfig, DataConfig
 from src.data.htr_datamodule import HTRDataModule
 from src.models.transformers_hf import HTRTransformerLitModule
+from src.models.seq2seq_module import Seq2SeqModule
 
 print(f'Importing modules...')
 
@@ -118,7 +119,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         ckpt_path = None
       
 
-    model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
+    # model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
+    if model.__class__.__name__ == 'HTRTransformerLitModule':
+        model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
+    elif model.__class__.__name__ == 'Seq2SeqModule':
+        model = Seq2SeqModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
     
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')
