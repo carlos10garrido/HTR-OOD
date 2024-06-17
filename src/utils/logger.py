@@ -53,6 +53,9 @@ class MetricLogger():
   def update_epoch(self, epoch):
     self.current_epoch = epoch
 
+  def log_learning_rate(self, lr, epoch):
+    self.logger.experiment.log({f'training/lr': lr, 'epoch': epoch})
+
   def log_images(self, images, dataset):
     img_grid = torchvision.utils.make_grid(images, normalize=False)
     # To PIL image
