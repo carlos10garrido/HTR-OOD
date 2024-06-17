@@ -1,0 +1,33 @@
+_target_: src.models.crnn_ctc_module.CRNN_CTC_Module
+# Accessing to data in configs/train_htr.yaml
+datasets: ${data}
+_logger: ${logger}
+tokenizer: ${tokenizer}
+
+
+optimizer:
+  _target_: torch.optim.RMSprop
+  _partial_: true
+  lr: 0.0003 
+
+scheduler: null 
+  #  We use an initial learning rate of 0.001 and apply a cosine-like decay 
+  # in the final 50 epochs to finetune the parameters of the network.
+  # _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  # _partial_: true
+  # mode: min
+  # factor: 0.1
+  # patience: 10
+
+net: 
+  _target_: src.models.components.cnn_san_arce.CNN_SAN_Arce
+  img_size: ${data.train.train_config.img_size}
+  tokenizer: ${tokenizer}
+  cnn_dropout: 0.2
+  dropout: 0.1
+  n_heads: 4
+  n_layers: 4
+  d_model: 192
+  hidden_dim: 512
+
+compile: falses
