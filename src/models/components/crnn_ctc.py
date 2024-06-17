@@ -43,7 +43,7 @@ class CRNN(nn.Module):
           bidirectional=True
         )
 
-        self.img_reduction = 8
+        self.img_reduction = (32, 8)
         
         # Add linear layer for classification
         self.out  = torch.nn.Sequential(  
@@ -62,7 +62,7 @@ class CRNN(nn.Module):
       x = self.proj_channels(x) if C == 1 else x
       x = self.backbone(x)
       x = x.view(B, x.shape[1]*x.shape[2], x.shape[3]).permute(0, 2, 1)
-      # x = self.lin_proj_to_lstm(x)
+      print(f'Image after flatten x.shape: {x.shape}')
       x, _ = self.lstm(x)
       return self.out(x)
     
