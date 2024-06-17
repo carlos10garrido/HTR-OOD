@@ -20,15 +20,10 @@ class Tokenizer: # Generic tokenizer class
       self.eos_token = "[EOS]"
       self.pad_token = "[PAD]"
       self.unk_token = "[UNK]"
-      # self.mask_token = "[MASK]"
-      # self.sep_token = "[SEP]"
       self.bos_id = 0
       self.eos_id = 1
       self.pad_id = 2
       self.unk_id = 3
-      # self.mask_id = 4
-      # self.sep_id = 5
-      # self.vocab_size = None
 
   def tokenize(self, text: str) -> List[int]:
       return self.encode(text)
@@ -39,9 +34,6 @@ class Tokenizer: # Generic tokenizer class
   def save(self, output_dir: str) -> None:
       self.model.save(output_dir, self.model_name)
 
-  # def prepare_text(self, text: str) -> List[int]:
-  #     return self.prepare_text(text)
-
   def prepare_text(self, text: str) -> List[int]:
       # Add BOS and EOS tokens to the encoded text and return tensor
       return torch.cat([
@@ -49,10 +41,6 @@ class Tokenizer: # Generic tokenizer class
         torch.tensor(self.encode(text)), 
         torch.tensor([EOS_IDX])
       ])
-
-  # def load(self, model_name: str) -> None:
-  #     self.model = models.SentencePiece.from_file(f"{model_name}.model")
-
 
 class CharTokenizer(Tokenizer):
     def __init__(self, model_name: str, vocab_file: str) -> None:
@@ -65,8 +53,15 @@ class CharTokenizer(Tokenizer):
 
     def decode(self, token_ids: List[int]) -> str:
         # Remove padding, BOS, and EOS tokens
-        token_ids = [token_id for token_id in token_ids if token_id not in [PAD_IDX, SOS_IDX, EOS_IDX]]
-        return "".join([self.ids_to_tokens[i] for i in token_ids])
+        # token_ids = [token_id for token_id in token_ids if token_id not in [PAD_IDX, SOS_IDX, EOS_IDX]]
+        # Add tokens until EOS is found
+        _token_ids = []
+        for token_id in token_ids:
+            if token_id in [EOS_IDX]:
+                break
+            if token_id not in [PAD_IDX, SOS_IDX]:
+              _token_ids.append(token_id)
+        return "".join([self.ids_to_tokens[i] for i in _token_ids])
 
     def pre_tokenize(self, text: str) -> str:
         return unidecode(text)
@@ -90,14 +85,15 @@ class CharTokenizer(Tokenizer):
       for i, char in enumerate(vocab):
         self.vocab[char] = i + 4
 
-      # ADD ['et'] + ['ç'] TO VOCAB
-      self.vocab['et'] = len(self.vocab)
-      self.vocab['ç'] = len(self.vocab)
+      # ADD ['et'] + ['ç'] TO VOCAB (not used since we use unidecode)
+      # self.vocab['et'] = len(self.vocab)
+      # self.vocab['ç'] = len(self.vocab)
 
 
       self.ids_to_tokens = {v: k for k, v in self.vocab.items()}
       self._vocab_size = len(self.vocab)
       print(f'VOCAB SIZE TOKENIZER: {self.vocab_size}')
+      print(f'COMPLETE VOCAB: {self.vocab}')
 
     @property
     def vocab_size(self) -> int:
