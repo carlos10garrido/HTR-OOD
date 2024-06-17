@@ -127,13 +127,15 @@ class CRNN_CTC_Module(LightningModule):
         y = batch[1].permute(1, 0)
         labels = y[:, 1:].clone().contiguous() # Shift all labels to the right
         target_lengths = torch.where(labels == self.tokenizer.eos_id)[1]
+        # print(f'target_lengths: {target_lengths}')
         labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         # Calculate for CTC the length of the sequence
         # Input_lenght: to which column in the image there is information
-        input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction)) - (padded_cols // self.net.img_reduction).int().to(images.device)
-
+        input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction[-1])) - (padded_cols // self.net.img_reduction[-1]).int().to(images.device)
+        
         # Arguments CTC LOSS: log_probs, target, input_lenghts, target_lenghts
+        # print(f'self.net(images).shape: {self.net(images).shape}')
         preds = self.net(images).log_softmax(-1).permute(1, 0, 2)
         loss = self.criterion(preds, labels, input_lengths, target_lengths)
 
@@ -252,6 +254,9 @@ class CRNN_CTC_Module(LightningModule):
           if isinstance(heldout_domain_cer, list):
             heldout_domain_cer = heldout_domain_cer[0].item()
           self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
+          
+        self.metric_logger.update_epoch(self.current_epoch)
+        self.metric_logger_minusc.update_epoch(self.current_epoch)
 
         
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = 0) -> None:
