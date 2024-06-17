@@ -114,7 +114,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         print(f'MODEL WILL BE TRAINED FROM SCRATCH: {model}')
         ckpt_path = None
       
-    model = CRNN_CTC_Module.load_from_checkpoint(ckpt_path, datasets=cfg.get("data")) if ckpt_path is not None else model
+    model = CRNN_CTC_Module.load_from_checkpoint(ckpt_path, datasets=cfg.get("data"), tokenizer=tokenizer) if ckpt_path is not None else model
 
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')
