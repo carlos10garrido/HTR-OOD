@@ -61,7 +61,6 @@ net:
   n_heads: 4
   encoder_layers: 4
   decoder_layers: 4
-  input_size: 128
   char_embedding_size: 256
   tokenizer: ${tokenizer}
 
