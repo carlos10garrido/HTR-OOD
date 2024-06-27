@@ -27,6 +27,93 @@ class PositionalEncoding(nn.Module):
         x = self.dropout(x)
         x = x.squeeze(-2)
         return x
+      
+class CNN_Encoder(nn.Module):
+  """CNN Encoder for the Light Barrere architecture"""
+  
+  def __init__(self, input_shape):
+      super(CNN_Encoder, self).__init__()
+      self.input_shape = input_shape
+      print(f'input_shape: {input_shape} to LN (first)')
+        
+      # Separte through layers to get the output
+      # Formula to calculate the output shape of a convolutional layer
+      # output_shape = [(input_shape - kernel_size + 2*padding)/stride] + 1
+      # Block 1
+      self.conv1 = nn.Conv2d(3, 8, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0))
+      self.leaky_relu = nn.LeakyReLU()
+      input_shape = (8, int((input_shape[1]-3+2*0)/1+1), int((input_shape[2]-3+2*0)/1+1))
+      print(f'input_shape: {input_shape} to LN')
+      
+      self.layer_norm1 = nn.LayerNorm(input_shape, elementwise_affine=False)
+      self.max_pool1 = nn.MaxPool2d(kernel_size=(2, 2))
+      input_shape = (8, input_shape[1]//2, input_shape[2]//2)
+      self.dropout = nn.Dropout(0.2)
+      
+      # Block 2
+      self.conv2 = nn.Conv2d(8, 16, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0))
+      
+      input_shape = (16, int((input_shape[1]-3+2*0)/1+1), int((input_shape[2]-3+2*0)/1+1))
+      print(f'input_shape: {input_shape} to LN')
+      self.layer_norm2 = nn.LayerNorm(input_shape, elementwise_affine=False)
+      self.max_pool2 = nn.MaxPool2d(kernel_size=(2, 2))
+      input_shape = (16, input_shape[1]//2, input_shape[2]//2)
+      
+      # Block 3
+      self.conv3 = nn.Conv2d(16, 32, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0))
+      input_shape = (32, int((input_shape[1]-3+2*0)/1+1), int((input_shape[2]-3+2*0)/1+1))
+      print(f'input_shape: {input_shape} to LN')
+      self.layer_norm3 = nn.LayerNorm(input_shape, elementwise_affine=False)
+      self.max_pool3 = nn.MaxPool2d(kernel_size=(2, 2))
+      input_shape = (32, input_shape[1]//2, input_shape[2]//2)
+      
+      # Block 4
+      self.conv4 = nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0))
+      input_shape = (64, int((input_shape[1]-3+2*0)/1+1), int((input_shape[2]-3+2*0)/1+1))
+      print(f'input_shape: {input_shape} to LN')
+      self.layer_norm4 = nn.LayerNorm(input_shape, elementwise_affine=False)
+      
+      # Block 5
+      self.conv5 = nn.Conv2d(64, 128, kernel_size=(4, 2), stride=(1, 1), padding=(0, 0))
+      input_shape = (128, int((input_shape[1]-4+2*0)/1+1), int((input_shape[2]-2+2*0)/1+1))
+      print(f'input_shape: {input_shape} to LN')
+      self.layer_norm5 = nn.LayerNorm(input_shape, elementwise_affine=False)
+        
+  def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # Block 1
+    x = self.conv1(x)
+    x = self.leaky_relu(x)
+    x = self.layer_norm1(x)
+    x = self.max_pool1(x)
+    x = self.dropout(x)
+    
+    # Block 2
+    x = self.conv2(x)
+    x = self.leaky_relu(x)
+    x = self.layer_norm2(x)
+    x = self.max_pool2(x)
+    x = self.dropout(x)
+    
+    # Block 3
+    x = self.conv3(x)
+    x = self.leaky_relu(x)
+    x = self.layer_norm3(x)
+    x = self.max_pool3(x)
+    x = self.dropout(x)
+    
+    # Block 4
+    x = self.conv4(x)
+    x = self.leaky_relu(x)
+    x = self.layer_norm4(x)
+    x = self.dropout(x)
+    
+    # Block 5
+    x = self.conv5(x)
+    x = self.leaky_relu(x)
+    x = self.layer_norm5(x)
+    x = self.dropout(x)
+    
+    return x
 
 class V_Light_Barrere(nn.Module):
     """ Hybrid architecture from 'A Light Transformer-Based Architecture for Handwritten Text Recognition' """
@@ -40,7 +127,6 @@ class V_Light_Barrere(nn.Module):
         n_heads=4,
         encoder_layers=4,
         decoder_layers=4,
-        input_size=128,
         char_embedding_size=256,
         tokenizer: Tokenizer=None
     ) -> None:
@@ -49,6 +135,7 @@ class V_Light_Barrere(nn.Module):
       self.image_size = image_size
       self.vocab_size = tokenizer.vocab_size
       self.tokenizer = tokenizer
+      self.leaky_relu = nn.LeakyReLU()
 
 
       # CNN encoder
@@ -61,41 +148,7 @@ class V_Light_Barrere(nn.Module):
       # A 2 × 2 max pooling is used inside the first three convolutional blocks to decrease the size of intermediate feature maps. 
       # Lastly, a dropout is applied with a probability of 0.2 at the end of each block.
       # Convert the comments to the actual code
-      self.cnn_encoder = nn.Sequential(
-        # Convolutional block 1
-        nn.Conv2d(3, 8, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)),
-        nn.LeakyReLU(),
-        nn.LayerNorm((8, 126, 1022), elementwise_affine=False),
-        nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-        nn.Dropout(0.1),
-
-        # Convolutional block 2
-        nn.Conv2d(8, 16, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)),
-        nn.LeakyReLU(),
-        nn.LayerNorm((16, 61, 509), elementwise_affine=False),
-        nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-        nn.Dropout(0.1),
-
-        # Convolutional block 3
-        nn.Conv2d(16, 32, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)),
-        nn.LeakyReLU(),
-        nn.LayerNorm((32, 28, 252), elementwise_affine=False),
-        nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-        nn.Dropout(0.1),
-
-        # Convolutional block 4
-        nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(0, 0)),
-        nn.LeakyReLU(),
-        nn.LayerNorm((64, 12, 124), elementwise_affine=False),
-        nn.Dropout(0.1),
-
-        # Convolutional block 5
-        nn.Conv2d(64, 128, kernel_size=(4, 2), stride=(1, 1), padding=(0, 0)),
-        nn.LeakyReLU(),
-        nn.LayerNorm((128, 9, 123), elementwise_affine=False),
-        nn.Dropout(0.1),
-          
-      )
+      self.cnn_encoder = CNN_Encoder(input_shape=(3, image_size[0], image_size[1]))
 
       # Calculate image reduction factor with the pooling layers and kernel sizes
       self.img_reduction = (14, 9)
@@ -103,7 +156,9 @@ class V_Light_Barrere(nn.Module):
 
       # Dense layer to collapse the CNN output
       
-      self.collapse_layer = nn.Linear(1152, hidden_dim)
+      self.collapse_layer = nn.Linear(1152, 128)
+      self.layer_norm_collapse = nn.LayerNorm(128, elementwise_affine=False)
+      self.dense = nn.Linear(128, hidden_dim)
       self.pred_ctc = nn.Linear(hidden_dim, self.vocab_size+1) # +1 for CTC blank token
 
       self.pe_encoder = PositionalEncoding(hidden_dim)
@@ -118,7 +173,7 @@ class V_Light_Barrere(nn.Module):
           dropout=dropout,
           batch_first=True,
           # bias=False,
-          norm_first=True
+          norm_first=False
         ),
         num_layers=encoder_layers
       )
@@ -131,7 +186,7 @@ class V_Light_Barrere(nn.Module):
           dropout=dropout,
           batch_first=True,
           # bias=False,
-          norm_first=True
+          norm_first=False
         ),
         num_layers=decoder_layers
       )
@@ -154,6 +209,9 @@ class V_Light_Barrere(nn.Module):
       # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
+      cnn_output = self.leaky_relu(cnn_output)
+      cnn_output = self.layer_norm_collapse(cnn_output)
+      cnn_output = self.dense(cnn_output)
       
       # Transformer encoder
       pe_output = self.pe_encoder(cnn_output)
@@ -166,8 +224,9 @@ class V_Light_Barrere(nn.Module):
       cross_output = self.pe_cross(encoder_output)
 
       # Add BOS token to the target
-      y = torch.cat([torch.ones(y.shape[0], 1, dtype=torch.int).to(x.device) * self.tokenizer.bos_id, y], dim=-1)
-      tgt_padding_mask = y == self.tokenizer.pad_id
+      y = torch.cat([torch.ones(y.shape[0], 1, dtype=torch.int).to(x.device) * self.tokenizer.bos_id, y], dim=-1).to(x.device)
+      # tgt_padding_mask = y == self.tokenizer.pad_id
+      # tgt_padding_mask = tgt_padding_mask.to(x.device)
 
       # Transformer decoder
       embedding_output = self.char_embedding(y)
@@ -179,7 +238,7 @@ class V_Light_Barrere(nn.Module):
         tgt=pe_decoder_output,
         tgt_mask=nn.Transformer.generate_square_subsequent_mask(y.size(1)),
         memory=cross_output,
-        tgt_key_padding_mask=tgt_padding_mask,
+        # tgt_key_padding_mask=tgt_padding_mask,
         tgt_is_causal=True
       )
 
@@ -202,6 +261,9 @@ class V_Light_Barrere(nn.Module):
       # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
+      cnn_output = self.leaky_relu(cnn_output)
+      cnn_output = self.layer_norm_collapse(cnn_output)
+      cnn_output = self.dense(cnn_output)
       
       # Transformer encoder
       pe_output = self.pe_encoder(cnn_output)
