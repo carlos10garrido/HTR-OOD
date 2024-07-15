@@ -12,6 +12,7 @@ from torch.nn.utils.rnn import pad_sequence
 from typing import Iterable, List
 from fontTools.ttLib import TTFont
 import cv2
+import re
 
 from unidecode import unidecode
 
@@ -126,6 +127,11 @@ def read_data_rimes(images_path, lines_path, files):
     # Read lines from .txt files
     with open(line_path, "r") as f:
       line = f.read().replace("\n", "")
+      line = line.replace("°", ".")
+      line = line.replace("œ", "oe")
+      line = line.replace("¤", "")
+      line = line.replace(" €", "€")
+      
       lines.append(line)
       images_paths.append(image_path)
     
@@ -141,6 +147,15 @@ def read_data_bentham(images_path, lines_path, files):
     # Read lines from .txt files
     with open(line_path, "r") as f:
       line = f.read().replace("\n", "")
+      line = line.replace("§", "S")
+      line = line.replace("|", " ")
+      
+      # Regex for bentham
+      line = re.sub(r'(\w)\s([,\.\!\:;\?])', '\g<1>\g<2>', line)  # noqa
+      line = re.sub(r'(["\'\(\[<])\s(\w+)', '\g<1>\g<2>', line)  # noqa
+      line = re.sub(r'(\w+)\s([\)\]>])', '\g<1>\g<2>', line)  # noqa
+      line = re.sub(r'\s+', ' ', line)  # noqa
+      
       lines.append(line)
       images_paths.append(image_path)
 
@@ -221,6 +236,16 @@ def read_data_rodrigo(images_path, lines_paths, files):
 
         # Remove \n if exists in the text
         text = text.replace("\n", "")
+        text = text.replace("♦", "")
+        text = text.replace("\\", "")
+        text = text.replace("|", "")
+        text = text.replace("þ", "p")
+        text = text.replace("Þ", "p")
+        text = text.replace("¶", "C")
+        text = text.replace("Ⴒ", "p")
+        text = text.replace("ք", "p")
+        text = text.replace("℣", "v")
+        
         file = image_id
 
         # Check if first_part is in files
@@ -250,6 +275,10 @@ def read_data_icfhr_2016(images_path, lines_paths, files):
 
       # Remove \n if exists in the text
       text = text.replace("\n", "")
+      text = text.replace("¾", "3/4")
+      text = text.replace("ß", "B")
+      text = text.replace("—", "-")
+      
       file = image_id 
       # file = "-".join(image_id_split[:2])
 
