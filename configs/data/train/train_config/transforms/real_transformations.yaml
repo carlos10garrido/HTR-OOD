@@ -38,7 +38,7 @@
       p: 0.5
       transforms: # Perspective
         - _target_: torchvision.transforms.v2.RandomPerspective
-          distortion_scale: 0.2
+          distortion_scale: 0.1
           p: 1.0
           fill: 255
 
@@ -48,5 +48,12 @@
         - _target_: torchvision.transforms.v2.GaussianBlur
           kernel_size: 3
           sigma: 2.0
+
+    - _target_: torchvision.transforms.v2.RandomApply # Padding left and right
+      p: 1.0
+      transforms:
+        - _target_: torchvision.transforms.v2.Pad
+          padding: 5
+          fill: 255
     
     - _target_: torchvision.transforms.v2.ToTensor

@@ -1,0 +1,9 @@
+- _target_: torchvision.transforms.v2.Compose
+  transforms:
+    - _target_: torchvision.transforms.v2.RandomApply # Padding left and right
+      p: 1.0
+      transforms:
+      - _target_: torchvision.transforms.v2.Pad
+        padding: 5
+        fill: 255
+    - _target_: torchvision.transforms.v2.ToTensor

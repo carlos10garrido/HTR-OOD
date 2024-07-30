@@ -10,6 +10,6 @@ train_config:
   binarize: True
   batch_size: 128
   num_workers: 4
-  pin_memory: False
+  pin_memory: True
   vocab_path: ${paths.data_dir}/vocab.txt
   
