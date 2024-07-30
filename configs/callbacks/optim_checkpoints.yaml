@@ -1,0 +1,10 @@
+# Create a yaml with defaults using DataConfig
+defaults:
+  - optim_targets:
+    - iam
+    - rimes
+    - saint_gall
+    - washington
+    - bentham
+    - rodrigo
+    - icfhr_2016
