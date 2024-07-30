@@ -115,6 +115,9 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
     # Instantiate sub callbacks.heldout_targets callbacks
     if "heldout_targets" in callbacks_cfg:
         callbacks.extend(instantiate_sub_callbacks(callbacks_cfg.heldout_targets))
+        
+    if "optim_targets" in callbacks_cfg:
+        callbacks.extend(instantiate_sub_callbacks(callbacks_cfg.optim_targets))
 
     return callbacks
 
