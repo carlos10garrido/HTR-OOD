@@ -3,6 +3,7 @@ defaults:
   - model_checkpoint_base
   - model_checkpoint_id
   - heldout_checkpoints
+  - optim_checkpoints
   - early_stopping
   - model_summary
   # - rich_progress_bar
