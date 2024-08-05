@@ -153,9 +153,9 @@ class CRNN_CTC_Module(LightningModule):
             cer = CER()(_pred, _label)
 
             # Log training image and predictions
-            orig_image = torchvision.utils.make_grid(images[i].detach().cpu(), nrow=1, normalize=True)
-            orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            self._logger.experiment.log({f'train/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+            # orig_image = torchvision.utils.make_grid(images[i].detach().cpu(), nrow=1, normalize=True)
+            # orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+            # self._logger.experiment.log({f'train/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
             # Write image on disk to check if it is correct
             # orig_image.save(f'./outputs/train_image_{batch_idx}_{i}.png')
@@ -165,16 +165,20 @@ class CRNN_CTC_Module(LightningModule):
         # update and log metrics
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         
+        # Log learning rate
+        lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        self.log(f'training/lr_step', lr, sync_dist=True, on_step=True, on_epoch=True, prog_bar=False)
+        
         return loss 
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         self.metric_logger.log_train_metrics()
-        # self.metric_logger.update_epoch(self.current_epoch)
-        # self.metric_logger_minusc.update_epoch(self.current_epoch)
-        self.train_cer_epoch = self.train_cer.compute()
-
-        self.log("train/cer_epoch", self.train_cer_epoch, on_epoch=True, prog_bar=True)
+        
+        lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        epoch = self.current_epoch
+        print(f'Learning rate: {lr} for epoch: {epoch}')
+        self.metric_logger.log_learning_rate(lr, epoch)
 
         pass
 
@@ -184,11 +188,17 @@ class CRNN_CTC_Module(LightningModule):
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
+        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         dataset = self.val_datasets[dataloader_idx]
-
-        preds = self.net(images).squeeze(-1).clone().argmax(-1)
+        raw_preds = self.net(images).squeeze(-1).clone()
+        
+        # Calculate confidence and perplexity
+        # self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+        # self.metric_logger.log_val_step_perplexity(raw_preds, labels, dataset)
+        
+        preds = raw_preds.clone().argmax(-1)
+        
         total_cer_per_batch = 0.0
         # print(f'---VALIDATION STEP----- ended')
         
@@ -211,9 +221,9 @@ class CRNN_CTC_Module(LightningModule):
 
           # Calculate CER
           cer = CER()(_pred, _label)
-          if batch_idx < 1:
-            orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
+          # if batch_idx < 1:
+          #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+          #   self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
 
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
@@ -226,7 +236,10 @@ class CRNN_CTC_Module(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
 
-        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers = self.metric_logger.log_val_metrics()
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cers = self.metric_logger.log_val_metrics()
+        for dataset, val_cer in val_cers.items():
+            self.log(f'val/val_cer_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+            
         print(f'mean_val_cer: {mean_val_cer}')
         self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
@@ -242,7 +255,10 @@ class CRNN_CTC_Module(LightningModule):
           self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cers_minus = self.metric_logger_minusc.log_val_metrics()
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
+        for dataset, val_cer in val_cers_minusc.items():
+          self.log(f'val/val_cer_minusc_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+          
         self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
@@ -370,7 +386,8 @@ class CRNN_CTC_Module(LightningModule):
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
-                    "monitor": "val/cer_epoch",
+                    # "monitor": "val/cer_epoch",
+                    "monitor": "val/in_domain_cer",
                     "interval": "epoch",
                     "frequency": 1,
                 },
