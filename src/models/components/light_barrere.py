@@ -213,7 +213,7 @@ class Light_Barrere(nn.Module):
       encoder_output = self.encoder(pe_output)
 
       # CTC prediction # [B,W,vocab_size+1] -> (permute) -> [W ,B,vocab_size+1]
-      pred_ctc_encoder = self.pred_ctc(encoder_output).permute(1, 0, 2) 
+      pred_ctc_encoder = self.pred_ctc(encoder_output).log_softmax(-1).permute(1, 0, 2) 
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
@@ -226,12 +226,16 @@ class Light_Barrere(nn.Module):
 
       # Positional encoding for the decoder
       pe_decoder_output = self.pe_decoder(embedding_output)
+
+      
+      tgt_key_padding_mask = (y == self.tokenizer.pad_id).to(x.device)
       
       decoder_output = self.decoder(
         tgt=pe_decoder_output,
         tgt_mask=nn.Transformer.generate_square_subsequent_mask(y.size(1)),
         memory=cross_output,
-        tgt_is_causal=True
+        tgt_is_causal=True,
+        tgt_key_padding_mask=tgt_key_padding_mask
       )
 
       # Output layer
@@ -262,13 +266,13 @@ class Light_Barrere(nn.Module):
       encoder_output = self.encoder(pe_output)
 
       # CTC prediction # [B,W,vocab_size+1] -> (permute) -> [W ,B,vocab_size+1]
-      pred_ctc_encoder = self.pred_ctc(encoder_output).permute(1, 0, 2) 
+      pred_ctc_encoder = self.pred_ctc(encoder_output).log_softmax(-1).permute(1, 0, 2) 
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
 
 
-      for i in range(1, 150):
+      for i in range(0, 128):
         embedding_output = self.char_embedding(output)
         pe_decoder_output = self.pe_decoder(embedding_output)
         decoder_output = self.decoder(
