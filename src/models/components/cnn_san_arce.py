@@ -83,7 +83,7 @@ class CNN_SAN_Arce(nn.Module):
       self.tokenizer = tokenizer
       self.img_reduction = (13, 9)
       self.vocab_size = tokenizer.vocab_size
-      self.pe_encoder = PositionalEncoding(d_model)
+      # self.pe_encoder = PositionalEncoding(d_model)
       self.embedding_encoder = nn.Linear(1280, d_model)
       self.self_attention = nn.TransformerEncoder(
         nn.TransformerEncoderLayer(
@@ -106,21 +106,14 @@ class CNN_SAN_Arce(nn.Module):
 
     # Training forward
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # print(f'INPUT: {x.shape}')
+        # print(f'Image shape: {x.shape}')
         x = self.cnn_encoder(x)
-        # print(f'CNN ENCODER OUTPUT: {x.shape}')
+        # print(f'CNN output shape: {x.shape}')
         x = x.flatten(1, 2).permute(0, 2, 1)
-        # print(f'FLATTENED: {x.shape}')
         x = self.embedding_encoder(x)
-        # print(f'EMBEDDING: {x.shape}')
-        x = self.pe_encoder(x)        
-        # print(f'PE: {x.shape}')
+        # x = self.pe_encoder(x)        
         x = self.self_attention(x)
-        # print(f'SELF-ATTENTION: {x.shape}')
         x = self.class_head(x)
-        # print(f'OUTPUT: {x.shape}') # [B, T, C]
-        # x = x.permute(1, 0, 2)
-        # print(f'PERMUTED: {x.shape}') # [T, B, C]
 
         return x
 
