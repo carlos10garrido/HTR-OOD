@@ -65,7 +65,10 @@ class Seq2SeqModule(LightningModule):
         self.decode = self.tokenizer.detokenize
 
         # loss function
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id) # 1 is the padding token
+        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id) # 1 is the padding token
+        
+        # add label smoothing of 0.4 for transformer kang
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id, label_smoothing=0.4)
 
         # metric objects for calculating and averaging accuracy across batches
         log.info(f'Logger in Seq2SeqModule: {_logger}. Keys: {list(_logger.keys())}')
@@ -80,6 +83,7 @@ class Seq2SeqModule(LightningModule):
 
         self.metric_logger = MetricLogger(
           logger=self._logger,
+          tokenizer=self.tokenizer,
           train_datasets=self.train_datasets,
           val_datasets=self.val_datasets,
           test_datasets=self.test_datasets,
@@ -87,6 +91,7 @@ class Seq2SeqModule(LightningModule):
 
         self.metric_logger_minusc = MetricLogger(
           logger=self._logger,
+          tokenizer=self.tokenizer,
           # Append minusc to val_datasets and test_datasets
           train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
           val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
@@ -125,22 +130,15 @@ class Seq2SeqModule(LightningModule):
           self.metric_logger.log_images(images, str_train_datasets)
 
         labels = batch[1].permute(1, 0)
-        # Print 10 labels
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
 
-        # Change labels where 1 to -100
-        # labels[labels == self.tokenizer.pad_id] = -100
-        # print(f'labels[:4]: {labels[:4]}')
-        # breakpoint()
         outputs = self.net(images, labels)
-
 
         # Check if outputs is an instance of Hugging Face ModelOutput
         if hasattr(outputs, 'logits'):
           logits = outputs.logits
           loss = outputs.loss
         else:
-          # logits = outputs[:, 1:]
           logits = outputs[:, :-1]
           loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
         
@@ -151,9 +149,6 @@ class Seq2SeqModule(LightningModule):
 
         # print argmax predictions
         preds = logits.argmax(-1)
-
-        print(f'Labels[:3]: {labels[:3]}')
-        print(f'Preds[:3]: {preds[:3]}')
 
         if batch_idx < 2:
           for i in range(images.shape[0]):
@@ -170,14 +165,21 @@ class Seq2SeqModule(LightningModule):
 
         # update and log metrics
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        
+        # Log learning rate
+        self.log("train/lr_step", self.trainer.optimizers[0].param_groups[0]['lr'], on_step=True, on_epoch=False, prog_bar=True)
 
         return loss 
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         self.metric_logger.log_train_metrics()
-        # self.metric_logger.update_epoch(self.current_epoch)
-        # self.metric_logger_minusc.update_epoch(self.current_epoch)
+        
+        # Log the learning rate for that epoch
+        lr = self.trainer.optimizers[0].param_groups[0]['lr']
+        epoch = self.current_epoch
+        print(f'Learning rate: {lr} for epoch: {epoch}')
+        self.metric_logger.log_learning_rate(lr, epoch)
 
         pass
 
@@ -200,8 +202,6 @@ class Seq2SeqModule(LightningModule):
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        # print(f'Labels val')
-        # print(f'labels[:4]: {labels[:4]}')
 
         total_cer_per_batch = 0.0
 
@@ -209,16 +209,18 @@ class Seq2SeqModule(LightningModule):
           str_train_datasets = f'val_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
 
+        preds, raw_preds = self.net.predict_greedy(images)
+        preds = preds.sequences if hasattr(preds, 'sequences') else preds[:, 1:].clone().contiguous() # Shift all labels to the right 
         
-        preds = self.net.predict_greedy(images)
-        preds = preds.sequences if hasattr(preds, 'sequences') else preds
-
-        # print(f'Preds val. Shape: {preds.shape}')
-        # print(f'preds[:4]: {preds[:4]}')
-
-        # preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
+        self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+        self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
+        self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
         
-        # TODO: adapt to seq2seq
+        with torch.no_grad():
+          _preds = self.net(images, labels)
+        self.metric_logger.log_val_step_ext_perplexity(_preds[:, :-1], labels, dataset)
+        
+        
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
           # images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
@@ -254,12 +256,15 @@ class Seq2SeqModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
 
-        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers = self.metric_logger.log_val_metrics()
+        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cers = self.metric_logger.log_val_metrics()
+        for dataset, val_cer in val_cers.items():
+            self.log(f'val/val_cer_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+        
         print(f'mean_val_cer: {mean_val_cer}')
         self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        # self.log(f'val/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
+        
         for name, heldout_domain_cer in heldout_domain_cers.items():
           # Check if heldout_domain_cer is a tensor or list
           if isinstance(heldout_domain_cer, torch.Tensor):
@@ -270,7 +275,10 @@ class Seq2SeqModule(LightningModule):
           self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_val_metrics()
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
+        for dataset, val_cer in val_cers_minusc.items():
+          self.log(f'val/val_cer_minusc_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+          
         self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
         self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
@@ -314,8 +322,16 @@ class Seq2SeqModule(LightningModule):
           str_train_datasets = f'test_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
         
-        preds = self.net.predict_greedy(images).sequences
+        preds = self.net.predict_greedy(images)#.sequences
         preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
+        
+        self.metric_logger.log_test_step_confidence(raw_preds, dataset)
+        self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
+        self.metric_logger.log_test_step_int_perplexity(raw_preds, dataset)
+        
+        with torch.no_grad():
+          _preds = self.net(images, labels)
+        self.metric_logger.log_test_step_ext_perplexity(_preds[:, :-1], labels, dataset)
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -376,13 +392,26 @@ class Seq2SeqModule(LightningModule):
         print(f'Number of parameters: {sum(p.numel() for p in self.parameters() if p.requires_grad)}')
         if self.hparams.scheduler is not None:
             print(f'Using scheduler: {self.hparams.scheduler}')
-            scheduler = self.hparams.scheduler(optimizer=optimizer)
+
+            # breakpoint()
+
+            # If the class of the scheduler is SequentialLR, set the optimizer for the scheduler
+            if "SequentialLR" in str(self.hparams.scheduler.func):
+              print(f'Using SequentialLR scheduler')
+              scheduler = self.hparams.scheduler(
+                optimizer=optimizer,
+                  schedulers=[
+                    self.hparams.scheduler.keywords['schedulers'][i](optimizer=optimizer) for i in range(len(self.hparams.scheduler.keywords['schedulers']))
+                  ]
+                )
+            else:
+              scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
                     "scheduler": scheduler,
                     "monitor": "val/cer_epoch",
-                    "interval": "epoch",
+                    "interval": "step",
                     "frequency": 1,
                 },
             }
