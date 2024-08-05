@@ -5,25 +5,8 @@ from PIL import Image
 import math
 from src.data.components.tokenizers import Tokenizer
 
-# class PositionalEncoding(nn.Module):
-#     def __init__(self, d_model, dropout=0.1, max_len=5000):
-#         super(PositionalEncoding, self).__init__()
-#         self.dropout = nn.Dropout(p=dropout)
-
-#         pe = torch.zeros(max_len, d_model)
-#         position = torch.arange(0, max_len).unsqueeze(1).float()
-#         div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
-#         pe[:, 0::2] = torch.sin(position * div_term)
-#         pe[:, 1::2] = torch.cos(position * div_term)
-#         pe = pe.unsqueeze(0).transpose(0, 1)
-#         self.register_buffer('pe', pe)
-
-#     def forward(self, x):
-#         x = x + self.pe[:x.size(0), :]
-#         return self.dropout(x)
-
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 200):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 400):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -132,6 +115,11 @@ class TransformerKangTorch(nn.Module):
         )
 
         self.class_head = nn.Linear(d_model, self.vocab_size)
+        
+        # Initialize parameters as a normal distribution
+        for p in self.parameters():
+          if p.dim() > 1:
+              nn.init.xavier_normal_(p)
 
       
     def forward(self, images: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -168,20 +156,20 @@ class TransformerKangTorch(nn.Module):
         tgt_mask = self.transformer.generate_square_subsequent_mask(input_ids.shape[1]).to(self.device)
         
 
-        print(f'src shape: {src.shape}. tgt shape: {tgt.shape}. tgt_mask shape: {tgt_mask.shape}. tgt_key_padding_mask shape: {tgt_key_padding_mask.shape}')
-        print(f'tgt_key_padding_mask: {tgt_key_padding_mask}')
+        # print(f'src shape: {src.shape}. tgt shape: {tgt.shape}. tgt_mask shape: {tgt_mask.shape}. tgt_key_padding_mask shape: {tgt_key_padding_mask.shape}')
+        # print(f'tgt_key_padding_mask: {tgt_key_padding_mask}')
 
-        print(f'INSIDE FORWARD')
-        print(f'input_ids: {input_ids.shape}')
-        print(f'input_ids[:4]: {input_ids[:4]}')
+        # print(f'INSIDE FORWARD')
+        # print(f'input_ids: {input_ids.shape}')
+        # print(f'input_ids[:4]: {input_ids[:4]}')
 
-        print(f'labels: {labels.shape}')
-        print(f'labels[:4]: {labels[:4]}')
+        # print(f'labels: {labels.shape}')
+        # print(f'labels[:4]: {labels[:4]}')
 
         outputs = self.transformer(
             src=src,
             tgt=tgt, 
-            # tgt_key_padding_mask=tgt_key_padding_mask,
+            tgt_key_padding_mask=tgt_key_padding_mask,
             tgt_mask=tgt_mask,
             tgt_is_causal=True
         )
