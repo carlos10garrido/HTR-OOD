@@ -14,7 +14,6 @@ import os
 
 from omegaconf import OmegaConf
 
-
 # import data_config as data_config
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
