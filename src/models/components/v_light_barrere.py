@@ -173,7 +173,7 @@ class V_Light_Barrere(nn.Module):
           dropout=dropout,
           batch_first=True,
           # bias=False,
-          norm_first=False
+          norm_first=True
         ),
         num_layers=encoder_layers
       )
@@ -186,7 +186,7 @@ class V_Light_Barrere(nn.Module):
           dropout=dropout,
           batch_first=True,
           # bias=False,
-          norm_first=False
+          norm_first=True
         ),
         num_layers=decoder_layers
       )
@@ -196,6 +196,11 @@ class V_Light_Barrere(nn.Module):
       
       # Output layer
       self.output = nn.Linear(hidden_dim, self.vocab_size)
+      
+      # Initialize weights glorot
+      for p in self.parameters():
+        if p.dim() > 1:
+          nn.init.xavier_uniform_(p)
 
       
 
@@ -218,7 +223,7 @@ class V_Light_Barrere(nn.Module):
       encoder_output = self.encoder(pe_output)
 
       # CTC prediction # [B,W,vocab_size+1] -> (permute) -> [W ,B,vocab_size+1]
-      pred_ctc_encoder = self.pred_ctc(encoder_output).permute(1, 0, 2) 
+      pred_ctc_encoder = self.pred_ctc(encoder_output).log_softmax(-1).permute(1, 0, 2) 
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
@@ -227,7 +232,9 @@ class V_Light_Barrere(nn.Module):
       y = torch.cat([torch.ones(y.shape[0], 1, dtype=torch.int).to(x.device) * self.tokenizer.bos_id, y], dim=-1).to(x.device)
       # tgt_padding_mask = y == self.tokenizer.pad_id
       # tgt_padding_mask = tgt_padding_mask.to(x.device)
-
+      
+      tgt_key_padding_mask = (y == self.tokenizer.pad_id).to(x.device)
+      
       # Transformer decoder
       embedding_output = self.char_embedding(y)
 
@@ -236,9 +243,9 @@ class V_Light_Barrere(nn.Module):
       
       decoder_output = self.decoder(
         tgt=pe_decoder_output,
-        tgt_mask=nn.Transformer.generate_square_subsequent_mask(y.size(1)),
+        tgt_mask=nn.Transformer.generate_square_subsequent_mask(y.size(1)).to(x.device),
         memory=cross_output,
-        # tgt_key_padding_mask=tgt_padding_mask,
+        tgt_key_padding_mask=tgt_key_padding_mask.to(x.device),
         tgt_is_causal=True
       )
 
@@ -274,9 +281,10 @@ class V_Light_Barrere(nn.Module):
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
+      
+      raw_output = []
 
-
-      for i in range(1, 150):
+      for i in range(1, 128):
         embedding_output = self.char_embedding(output)
         pe_decoder_output = self.pe_decoder(embedding_output)
         decoder_output = self.decoder(
@@ -286,11 +294,12 @@ class V_Light_Barrere(nn.Module):
         # output = torch.cat([output, self.output(decoder_output).argmax(dim=-1)[:, -1].unsqueeze(-1)], dim=1)
 
         # next_token = self.output(decoder_output)[:,-1,:].argmax(dim=-1).unsqueeze(-1)
+        raw_output.append(self.output(decoder_output)[:,-1,:])
         next_token = self.output(decoder_output)[:,-1].argmax(dim=-1).unsqueeze(-1)
         output = torch.cat([output, next_token], dim=-1)
 
       # breakpoint()
-      return output
+      return output, torch.stack(raw_output, dim=1)
 
 if __name__ == "__main__":
     _ = V_Light_Barrere()
