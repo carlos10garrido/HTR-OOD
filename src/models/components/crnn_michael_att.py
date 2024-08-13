@@ -54,6 +54,7 @@ class CRNN_Michael(nn.Module):
       self.tokenizer = tokenizer
       self.layers_encoder = layers_encoder
       self.layers_decoder = layers_decoder
+      self.hidden_size = hidden_size
 
       # CNN encoder
       # The encoder is a three-layer CNN with interleaved maxpooling layers, followed by three BLSTM layers:
@@ -79,7 +80,7 @@ class CRNN_Michael(nn.Module):
       
       self.rnn_encoder = nn.LSTM(
           input_size=input_size,
-          hidden_size=input_size,
+          hidden_size=self.hidden_size,
           num_layers=layers_encoder,
           bidirectional=True,
           dropout=dropout_encoder,
@@ -88,92 +89,111 @@ class CRNN_Michael(nn.Module):
 
       # Linear projection (original paper implemented as a 1x1 convolutional layer
       # Linear layer is faster since it does not require permutation of the tensor
-      self.ctc_pred = nn.Linear(2*input_size, self.vocab_size+1) # +1 for ctc blank token
-      self.combine_c_h = nn.Linear(hidden_size*4, hidden_size, bias=True)
+      self.ctc_pred = nn.Linear(self.hidden_size*2, self.vocab_size+1) # +1 for ctc blank token. These are H in the paper
+      # self.combine_c_h = nn.Linear(self.hidden_size*2, self.hidden_size, bias=True)
+      self.combine_c_h = nn.Linear(self.vocab_size+1 + self.hidden_size, self.hidden_size, bias=True)
       # self.act = nn.Tanh()
-      self.act = nn.ReLU()
+      # self.act = nn.ReLU()
+      self.act = nn.Identity()
       
-      self.attention = ContentBasedAttention(input_size*2, input_size*2, att_dim)
-      self.char_embedding = nn.Embedding(self.vocab_size, char_embedding_size)
+      self.attention = ContentBasedAttention(self.vocab_size+1, input_size*2, att_dim)
+      self.char_embedding = nn.Embedding(self.vocab_size+1, char_embedding_size)
 
       self.decoder = nn.LSTM(
-        input_size=char_embedding_size, # character embedding size
-        hidden_size=hidden_size*2, # double the size of the encoder hidden size
+        input_size=char_embedding_size + self.hidden_size,
+        hidden_size=self.hidden_size, # double the size of the encoder hidden size
         num_layers=layers_decoder,
         dropout=dropout_encoder,
         bidirectional=False,
         batch_first=True
       )
 
-      self.output = nn.Linear(hidden_size, self.vocab_size)
+      self.output = nn.Linear(hidden_size*2, self.vocab_size)
 
     def init_x(self, batch_size):
       return torch.ones((batch_size, 1), dtype=torch.long) * self.tokenizer.bos_id
 
     def init_h(self, batch_size, decoder_dim, num_layers=1):
-      return torch.Tensor(batch_size, num_layers, decoder_dim).normal_()
-      # return torch.Tensor(batch_size, num_layers, decoder_dim).zero_()
+      # return torch.Tensor(batch_size, num_layers, decoder_dim).normal_()
+      return torch.Tensor(batch_size, num_layers, decoder_dim).zero_()
     
     
 
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
     # def forward(self, x: torch.Tensor) -> torch.Tensor:
+      # breakpoint()
       # CNN encoder
       x = self.cnn_encoder(x)
+      print(f'CNN encoder output shape: {x.shape}')
       x = x.flatten(1, 2).permute(0, 2, 1)
+      print(f'Flattened CNN encoder output shape: {x.shape}')
       
       # RNN encoder
       self.rnn_encoder.flatten_parameters()
       x, _ = self.rnn_encoder(x)
 
       # Return x for CTC loss
+      # encoder_outputs = x.clone()
+      # cnn_output = self.ctc_pred(x)
+      x = self.ctc_pred(x)
       encoder_outputs = x.clone()
-      cnn_output = self.ctc_pred(x)
 
       # Decoder 
       batch_size, enc_sequence_length, enc_dim = x.size()
       batch_size, dec_sequence_length = y.size()
 
       output = self.init_x(batch_size).to(x.device)
-      h = self.init_h(batch_size, enc_dim, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
-      c_0 = torch.zeros(batch_size, self.layers_decoder, enc_dim).to(x.device).permute(1, 0, 2).contiguous()
-      context = c_0
+      h = self.init_h(batch_size, self.hidden_size, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
+      c = torch.zeros(batch_size, self.layers_decoder, self.hidden_size).to(x.device).permute(1, 0, 2).contiguous()
+      context = c # Initalize first context vector with zeros
       logit_list = []
-      # append B, 1 with zeros to logit_list
+
       logit_list.append(torch.ones(batch_size, self.vocab_size).to(x.device) * self.tokenizer.bos_id)
       
       # Flatten parameters
       self.decoder.flatten_parameters()
       
+      char_embeddings = self.char_embedding(y)
+      
+      # h = [1, batch_size, hidden_size]
+      # c = [1, batch_size, hidden_size]
+      # context = [1, batch_size, hidden_size]
+      
       for i in range(dec_sequence_length):
-          output = self.char_embedding(output)
-          x, (h, context) = self.decoder(output, (h, context))
+          char_embed = char_embeddings[:, i, :].unsqueeze(0)
+          input_embed = torch.cat([char_embed, context], dim=-1).permute(1, 0, 2)
+          
+          
+          out, (h, c) = self.decoder(input_embed, (h, c))
           
           # Attention 
-          alpha = self.attention(encoder_outputs, h[0])
+          alpha = self.attention(encoder_outputs, h[0]) # Since we have to squeeze the 1 dimension
 
           # Weighted-sum
           # [batch_size, out_dim]
-          context = torch.sum(alpha.unsqueeze(-1) * encoder_outputs, dim=1)
+          context = torch.sum(alpha.unsqueeze(-1) * encoder_outputs, dim=1).unsqueeze(0)
+          context = torch.cat([context, h], dim=-1) # Generate context vector
           
-          concat_c_h = torch.cat([context, h[0]], dim=-1)
-          attentional = self.act(self.combine_c_h(concat_c_h)).reshape(batch_size, -1)
-
+          context = self.act(self.combine_c_h(context)) 
+          
           # [batch_size, vocab_size]
-          logit = self.output(attentional)
+          logit = self.output(torch.cat([context, h], dim=-1)) # Predict the next character
+
           # print(f'Logit shape: {logit.shape}')
+          logit = logit.squeeze(0)
           logit_list.append(logit)
 
-          output = y[:, i] # Teacher forcing
-          output = output.unsqueeze(1)
+          # output = y[:, i] # Teacher forcing
+          # output = output.unsqueeze(1)
           
-          context = context.unsqueeze(0)
+          # context = context.unsqueeze(0)
           # print(f'Output shape in teacher forcing: {output.shape}')
           
       # print(f'torch.stack(logit_list, dim=1): {torch.stack(logit_list, dim=1).shape}')
 
       # return cnn_output.log_softmax(-1).permute(1, 0, 2), torch.stack(logit_list, dim=1)
+      # breakpoint()
       return torch.stack(logit_list, dim=1) # Only for seq2seq training
 
 
@@ -182,6 +202,9 @@ class CRNN_Michael(nn.Module):
       # CNN encoder
       x = self.cnn_encoder(x)
       x = x.flatten(1, 2).permute(0, 2, 1)
+      
+      # TODO change all this to match forward
+      
       
       # RNN encoder
       self.rnn_encoder.flatten_parameters()
