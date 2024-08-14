@@ -125,9 +125,7 @@ class CRNN_Michael(nn.Module):
       # breakpoint()
       # CNN encoder
       x = self.cnn_encoder(x)
-      print(f'CNN encoder output shape: {x.shape}')
       x = x.flatten(1, 2).permute(0, 2, 1)
-      print(f'Flattened CNN encoder output shape: {x.shape}')
       
       # RNN encoder
       self.rnn_encoder.flatten_parameters()
@@ -143,7 +141,6 @@ class CRNN_Michael(nn.Module):
       batch_size, enc_sequence_length, enc_dim = x.size()
       batch_size, dec_sequence_length = y.size()
 
-      output = self.init_x(batch_size).to(x.device)
       h = self.init_h(batch_size, self.hidden_size, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
       c = torch.zeros(batch_size, self.layers_decoder, self.hidden_size).to(x.device).permute(1, 0, 2).contiguous()
       context = c # Initalize first context vector with zeros
@@ -154,6 +151,9 @@ class CRNN_Michael(nn.Module):
       # Flatten parameters
       self.decoder.flatten_parameters()
       
+      # Add <BOS> token to the beginning of the sequence
+      y = torch.cat([torch.ones(batch_size, 1).to(x.device) * self.tokenizer.bos_id, y], dim=1).long().to(x.device)
+      
       char_embeddings = self.char_embedding(y)
       
       # h = [1, batch_size, hidden_size]
@@ -163,8 +163,6 @@ class CRNN_Michael(nn.Module):
       for i in range(dec_sequence_length):
           char_embed = char_embeddings[:, i, :].unsqueeze(0)
           input_embed = torch.cat([char_embed, context], dim=-1).permute(1, 0, 2)
-          
-          
           out, (h, c) = self.decoder(input_embed, (h, c))
           
           # Attention 
@@ -184,16 +182,7 @@ class CRNN_Michael(nn.Module):
           logit = logit.squeeze(0)
           logit_list.append(logit)
 
-          # output = y[:, i] # Teacher forcing
-          # output = output.unsqueeze(1)
-          
-          # context = context.unsqueeze(0)
-          # print(f'Output shape in teacher forcing: {output.shape}')
-          
-      # print(f'torch.stack(logit_list, dim=1): {torch.stack(logit_list, dim=1).shape}')
-
       # return cnn_output.log_softmax(-1).permute(1, 0, 2), torch.stack(logit_list, dim=1)
-      # breakpoint()
       return torch.stack(logit_list, dim=1) # Only for seq2seq training
 
 
@@ -203,55 +192,58 @@ class CRNN_Michael(nn.Module):
       x = self.cnn_encoder(x)
       x = x.flatten(1, 2).permute(0, 2, 1)
       
-      # TODO change all this to match forward
-      
-      
       # RNN encoder
       self.rnn_encoder.flatten_parameters()
       x, _ = self.rnn_encoder(x)
-      encoder_outputs = x.clone()
 
+      # Return x for CTC loss
+      # encoder_outputs = x.clone()
+      # cnn_output = self.ctc_pred(x)
+      x = self.ctc_pred(x)
+      encoder_outputs = x.clone()
       
       # Decoder
       batch_size, enc_sequence_length, enc_dim = x.size()
 
       output = self.init_x(batch_size).to(x.device)
-      h = self.init_h(batch_size, enc_dim, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
-      c_0 = torch.zeros(batch_size, self.layers_decoder, enc_dim).to(x.device).permute(1, 0, 2).contiguous()
-      context = c_0
+      h = self.init_h(batch_size, self.hidden_size, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
+      c = torch.zeros(batch_size, self.layers_decoder, self.hidden_size).to(x.device).permute(1, 0, 2).contiguous()
+      context = c # Initalize first context vector with zeros
       output_list = []
       output_list.append(torch.ones(batch_size).to(x.device) * self.tokenizer.bos_id)
       
       raw_preds = []
       
-      
       # Flatten parameters
       self.decoder.flatten_parameters()
       
+      # output = [batch_size, 1]
+      
       for i in range(120):
-          output = self.char_embedding(output)
-          x, (h, context) = self.decoder(output, (h, context))
+          char_embed = self.char_embedding(output).permute(1, 0, 2)
+          input_embed = torch.cat([char_embed, context], dim=-1).permute(1, 0, 2)
+          out, (h, c) = self.decoder(input_embed, (h, c))
 
           # Attention
-          alpha = self.attention(encoder_outputs, h[0])
+          alpha = self.attention(encoder_outputs, h[0]) # Since we have to squeeze the 1 dimension
 
           # Weighted-sum
           # [batch_size, out_dim]
-          context = torch.sum(alpha.unsqueeze(-1) * encoder_outputs, dim=1)
-          attentional = self.act(self.combine_c_h(torch.cat([context, h[0]], dim=-1)).reshape(batch_size, -1))
-
+          context = torch.sum(alpha.unsqueeze(-1) * encoder_outputs, dim=1).unsqueeze(0)
+          context = torch.cat([context, h], dim=-1) # Generate context vector
+          
+          context = self.act(self.combine_c_h(context)) 
+          
+          
           # [batch_size, vocab_size]
-          logit = self.output(attentional)
-          raw_preds.append(logit)
+          logit = self.output(torch.cat([context, h], dim=-1)).squeeze(0) # Predict the next character
+          raw_preds.append(logit.squeeze(0))
 
           # Greedy Decoding
           logit = torch.argmax(logit, dim=-1)
-          output = logit.unsqueeze(1)
-          # print(f'Output shape in greedy decoding: {output.shape}')
+          output = logit.unsqueeze(1) # [batch_size] - [batch_size, 1]
           output_list.append(logit)
           
-          context = context.unsqueeze(0)
-
       # print(f'VAL torch.stack(output_list, dim=1): {torch.stack(output_list, dim=1).shape}')
       return torch.stack(output_list, dim=1), torch.stack(raw_preds, dim=1)
       # return torch.stack(output_list, dim=1) # Only for seq2seq inference
