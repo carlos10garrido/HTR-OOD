@@ -17,7 +17,7 @@
         iterations: 1
 
     - _target_: torchvision.transforms.v2.RandomApply
-      p: 0.5
+      p: 1.0
       transforms: # (σ = 8 and α = 64 intially, was too much)
         - _target_: torchvision.transforms.v2.ElasticTransform
           sigma: 5.0
@@ -30,23 +30,23 @@
         degrees: [-2, 2] # pi/60 radians
         fill: 255
         
-    # - _target_: torchvision.transforms.v2.RandomApply
-    #   p: 0.2
-    #   transforms: # Brightness +- 25%
-    #     - _target_: torchvision.transforms.v2.ColorJitter
-    #       brightness: 0.25
-    #       contrast: 0
-    #       saturation: 0
-    #       hue: 0
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.2
+      transforms: # Brightness +- 25%
+        - _target_: torchvision.transforms.v2.ColorJitter
+          brightness: 0.25
+          contrast: 0
+          saturation: 0
+          hue: 0
 
-    # - _target_: torchvision.transforms.v2.RandomApply
-    #   p: 0.2
-    #   transforms: # Contrast +- 25%
-    #     - _target_: torchvision.transforms.v2.ColorJitter
-    #       brightness: 0
-    #       contrast: 0.25
-    #       saturation: 0
-    #       hue: 0
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.2
+      transforms: # Contrast +- 25%
+        - _target_: torchvision.transforms.v2.ColorJitter
+          brightness: 0
+          contrast: 0.25
+          saturation: 0
+          hue: 0
 
     - _target_: torchvision.transforms.v2.RandomApply
       p: 0.2
@@ -55,36 +55,36 @@
           sharpness_factor: 1.25
           p: 1.0 # Apply always if the transform is selected
 
-    # # Degradations
-    # - _target_: torchvision.transforms.v2.RandomApply
-    #   p: 1.0
-    #   transforms:
-    #   - _target_: src.data.data_utils.Degradations
-    #          # Brownish color
-    #     ink_colors: [
-    #       "#805b43",
-    #       "#704f3a",
-    #       "#6b4b38",
-    #       "#604432",
-    #       "#5b402f",
-    #       "#50382a",
-    #       "#4a3527",
-    #       "#402d21",
-    #       "#3a291e",
-    #       "#302219",
-    #       "#2a1e16",
-    #       "#201610",
-    #       "#1a120e",
-    #       "#100b08",
-    #       "#050302",
-    #       "#999999",
-    #       "#777777", 
-    #       "#555555", 
-    #       "#333333",
-    #       "#111111",
-    #       "#000000"
-    #     ]
-    #     paths_backgrounds: "data/htr_datasets/"
+    # Degradations
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 1.0
+      transforms:
+      - _target_: src.data.data_utils.Degradations
+             # Brownish color
+        ink_colors: [
+          "#805b43",
+          "#704f3a",
+          "#6b4b38",
+          "#604432",
+          "#5b402f",
+          "#50382a",
+          "#4a3527",
+          "#402d21",
+          "#3a291e",
+          "#302219",
+          "#2a1e16",
+          "#201610",
+          "#1a120e",
+          "#100b08",
+          "#050302",
+          "#999999",
+          "#777777", 
+          "#555555", 
+          "#333333",
+          "#111111",
+          "#000000"
+        ]
+        paths_backgrounds: "data/htr_datasets/"
     # - _target_: torchvision.transforms.v2.RandomApply
     #   p: 0.2
     #   transforms:
@@ -131,12 +131,5 @@
     #   - _target_: src.data.data_utils.AddBackground
     #     # kernel_size: 3
     #     # iterations: 1
-
-    - _target_: torchvision.transforms.v2.RandomApply # Padding left and right
-      p: 1.0
-      transforms:
-        - _target_: torchvision.transforms.v2.Pad
-          padding: 15
-          fill: 255
 
     - _target_: torchvision.transforms.v2.ToTensor

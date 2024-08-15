@@ -1,5 +1,6 @@
 defaults: 
   - test_config: test
+  - test_config/transforms: no_transformations
 
 # Put your dataset configs here
 test_config:
@@ -11,13 +12,4 @@ test_config:
   num_workers: 4
   pin_memory: True
   vocab_path: ${paths.data_dir}/vocab.txt
-  transforms:
-    - _target_: torchvision.transforms.v2.Compose
-      transforms:
-        - _target_: torchvision.transforms.v2.RandomApply # Padding left and right
-          p: 1.0
-          transforms:
-          - _target_: torchvision.transforms.v2.Pad
-            padding: 5
-            fill: 255
-        - _target_: torchvision.transforms.v2.ToTensor
+  
