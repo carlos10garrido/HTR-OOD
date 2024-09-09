@@ -23,8 +23,8 @@ from datasets import load_dataset
 import cv2
 
 import torchvision
-import sklearn
-from sklearn.cluster import KMeans
+# import sklearn
+# from sklearn.cluster import KMeans
 from unidecode import unidecode
 
 
@@ -123,11 +123,12 @@ class HTRDatasetSynthRandom(Dataset):
         return image, sequence
 
 class HTRDatasetSynth(Dataset):
-    def __init__(self, sequences, sequences_distr, fonts, transform=None):
+    def __init__(self, sequences, sequences_distr, fonts, binarize=False, transform=None):
         self.sequences = sequences
         # self.sequences_distr = sequences_distr
         self.fonts = read_htr_fonts(fonts)
         self.transform = transform
+        self.binarize = binarize
 
     def __len__(self):
         return len(self.sequences)
@@ -214,11 +215,14 @@ class HTRDatasetSynth(Dataset):
 
                 font = np.random.choice(self.fonts)
 
-        # image = generate_image(sequence, font, background_colors, text_color)
-        # image = self.transform(image)
-
-
-        # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
+        if self.binarize:
+          # Convert to grayscale if image is not grayscale
+          if len(image.shape) == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+          # Binarize image with opencv Otsu algorithm
+          _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+          
+        # image = Image.fromarray(image)
 
         # # Binarize image using Opencv
         # if len(image.shape) == 3:
@@ -246,30 +250,6 @@ class HTRDataset(Dataset):
     def __len__(self):
         return len(self.paths_images)
 
-    def binarize_image(self, image, channels=3):
-      image = image.numpy()
-      image = image/image.reshape(-1).max()
-
-      # Change Nan values to 0
-      image[np.isnan(image)] = 0.0
-
-      try:
-        kmeans_image = KMeans(n_clusters=2, random_state=0, n_init='auto').fit(image.reshape(channels, -1).transpose(1, 0))
-        image_bin = kmeans_image.predict(image.reshape(channels, -1).transpose(1, 0))
-        vector_diff = kmeans_image.cluster_centers_[0] - kmeans_image.cluster_centers_[1]
-        image_bin = image_bin.reshape(image.shape[-2], image.shape[-1])
-
-        if np.sum(vector_diff) > 0.0: # Cluster 0 assignations should be 1 and Cluster 1 assignations should be 0
-          image_bin = 1 - image_bin
-
-        image_bin = image_bin.reshape(1, image.shape[-2], image.shape[-1])
-      except Exception as e:
-        print(f'Exception {e} while binarizing image. Returning image as is...')
-        image_bin = image
-
-      return image_bin
-
-
     def __getitem__(self, idx):
         sequece = self.words[idx]
 
@@ -291,8 +271,6 @@ class HTRDataset(Dataset):
 
         # Write image on disk to check if image is read correctly
         # image.save(f'outputs/train_np_array{self.paths_images[idx].split("/")[-1]}')
-
-
 
         if self.transform:
           image = self.transform(image)
@@ -354,6 +332,7 @@ class HTRDataModule(pl.LightningDataModule):
             log.info(f'Setting up stage {_stage}')
             self.__setattr__(_stage + "_sampler", None)
             
+            print(f'CONFIGS: {configs[_stage]}')
             for dataset in configs[_stage].datasets:
               ds = configs[_stage].datasets[dataset]
               
@@ -460,6 +439,7 @@ class HTRDataModule(pl.LightningDataModule):
             collate_fn=lambda batch: collate_fn(batch, img_size=self.train_config.img_size, text_transform=self.text_transform),
             sampler=self.val_sampler if self.val_sampler is not None else None
         ) for dataset in self.val_dataset]
+        # ) for dataset in [self.train_dataset]] # For overfitting purposes
 
     def test_dataloader(self):
         return [DataLoader(
