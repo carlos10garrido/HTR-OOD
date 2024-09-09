@@ -30,23 +30,23 @@
         degrees: [-2, 2] # pi/60 radians
         fill: 255
         
-    # - _target_: torchvision.transforms.v2.RandomApply
-    #   p: 0.2
-    #   transforms: # Brightness +- 25%
-    #     - _target_: torchvision.transforms.v2.ColorJitter
-    #       brightness: 0.25
-    #       contrast: 0
-    #       saturation: 0
-    #       hue: 0
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.2
+      transforms: # Brightness +- 25%
+        - _target_: torchvision.transforms.v2.ColorJitter
+          brightness: 0.25
+          contrast: 0
+          saturation: 0
+          hue: 0
 
-    # - _target_: torchvision.transforms.v2.RandomApply
-    #   p: 0.2
-    #   transforms: # Contrast +- 25%
-    #     - _target_: torchvision.transforms.v2.ColorJitter
-    #       brightness: 0
-    #       contrast: 0.25
-    #       saturation: 0
-    #       hue: 0
+    - _target_: torchvision.transforms.v2.RandomApply
+      p: 0.2
+      transforms: # Contrast +- 25%
+        - _target_: torchvision.transforms.v2.ColorJitter
+          brightness: 0
+          contrast: 0.25
+          saturation: 0
+          hue: 0
 
     - _target_: torchvision.transforms.v2.RandomApply
       p: 0.2
