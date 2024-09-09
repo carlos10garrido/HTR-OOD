@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torchvision
 import wandb
-import torchmetrics.text as text_metrics
 import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,6 +18,7 @@ class MetricLogger():
     test_datasets=[]):
 
     # self.pl_logger = pl_logger
+    # breakpoint()
     print(f'Initializing MetricLogger...')
     print(f'Logger: {logger}')
     self.logger = logger
@@ -34,8 +34,8 @@ class MetricLogger():
     # Set validation metris per dataset as a dict of lists
     self.val_losses = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_accs = {val_dataset: [] for val_dataset in self.val_datasets}
-    self.val_cers = {val_dataset: torchmetrics.CharErrorRate() for val_dataset in self.val_datasets}
-    self.val_wers = {val_dataset: torchmetrics.WordErrorRate() for val_dataset in self.val_datasets}
+    self.val_cers = {val_dataset: torchmetrics.text.CharErrorRate() for val_dataset in self.val_datasets}
+    self.val_wers = {val_dataset: torchmetrics.text.WordErrorRate() for val_dataset in self.val_datasets}
     self.best_val_cers = {val_dataset: 1e5 for val_dataset in self.val_datasets}
     self.best_val_wers = {val_dataset: 1e5 for val_dataset in self.val_datasets}
     self.mean_best_val_cer = 1e5
@@ -49,16 +49,16 @@ class MetricLogger():
     self.val_confidences = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_calibrations = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_int_perplexities = {val_dataset: [] for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
-    self.val_ext_perplexities = {val_dataset: torchmetrics.text.Perplexity(ignore_index=2).to(device) for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
+    self.val_ext_perplexities = {val_dataset: torchmetrics.text.Perplexity(ignore_index=2) for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
     
     
     # Set test metrics per dataset as a dict()
-    self.cer_test = {test_dataset: torchmetrics.CharErrorRate() for test_dataset in self.test_datasets}
-    self.wer_test = {test_dataset: torchmetrics.WordErrorRate() for test_dataset in self.test_datasets}
+    self.cer_test = {test_dataset: torchmetrics.text.CharErrorRate() for test_dataset in self.test_datasets}
+    self.wer_test = {test_dataset: torchmetrics.text.WordErrorRate() for test_dataset in self.test_datasets}
     self.test_confidences = {test_dataset: [] for test_dataset in self.test_datasets}
     self.test_calibrations = {test_dataset: [] for test_dataset in self.test_datasets}
     self.test_int_perplexities = {test_dataset: [] for test_dataset in self.test_datasets}
-    self.test_ext_perplexities = {test_dataset: torchmetrics.text.Perplexity(ignore_index=2).to(device) for test_dataset in self.test_datasets} # Ignore BOS, EOS, PAD
+    self.test_ext_perplexities = {test_dataset: torchmetrics.text.Perplexity(ignore_index=2) for test_dataset in self.test_datasets} # Ignore BOS, EOS, PAD
 
     print(f'Train datasets: {self.train_datasets}')
     print(f'Validation datasets: {self.val_datasets}')
@@ -103,6 +103,8 @@ class MetricLogger():
     self.wer_test[test_dataset].update(output, label)
     
   def calculate_confidence(self, raw_preds):
+    # Convert raw_preds to float64 specifically to avoid overflow
+    raw_preds = raw_preds.float()
     return torch.nn.functional.softmax(raw_preds, dim=-1).max(dim=-1).values.mean().item()
     
   def log_val_step_confidence(self, raw_preds, dataset):
@@ -153,7 +155,7 @@ class MetricLogger():
       pred = raw_pred.softmax(-1).argmax(-1).tolist()
       pred = self.tokenizer.detokenize(pred)
       label = self.tokenizer.detokenize(label.tolist())
-      cer_seq = torchmetrics.CharErrorRate()(pred, label)
+      cer_seq = torchmetrics.text.CharErrorRate()(pred, label)
       confidence = self.calculate_confidence(raw_pred)
       calibration = torch.abs(cer_seq - confidence)
       calibrations.append(calibration)
@@ -210,7 +212,7 @@ class MetricLogger():
       pred = raw_pred.softmax(-1).argmax(-1).tolist()
       pred = self.tokenizer.detokenize(pred)
       label = self.tokenizer.detokenize(label.tolist())
-      cer_seq = torchmetrics.CharErrorRate()(pred, label)
+      cer_seq = torchmetrics.text.CharErrorRate()(pred, label)
       confidence = self.calculate_confidence(raw_pred)
       calibration = torch.abs(cer_seq - confidence)
       calibrations.append(calibration)
@@ -436,12 +438,12 @@ class MetricLogger():
     # Reset lists
     self.val_losses = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_accs = {val_dataset: [] for val_dataset in self.val_datasets}
-    self.val_cers = {val_dataset: torchmetrics.CharErrorRate() for val_dataset in self.val_datasets}
-    self.val_wers = {val_dataset: torchmetrics.WordErrorRate() for val_dataset in self.val_datasets}
+    self.val_cers = {val_dataset: torchmetrics.text.CharErrorRate() for val_dataset in self.val_datasets}
+    self.val_wers = {val_dataset: torchmetrics.text.WordErrorRate() for val_dataset in self.val_datasets}
     self.val_confidences = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_calibrations = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_int_perplexities = {val_dataset: [] for val_dataset in self.val_datasets}
-    self.val_ext_perplexities = {val_dataset: torchmetrics.Perplexity(ignore_index=2).to(device) for val_dataset in self.val_datasets}
+    self.val_ext_perplexities = {val_dataset: torchmetrics.Perplexity(ignore_index=2) for val_dataset in self.val_datasets}
 
     return mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cer
 
