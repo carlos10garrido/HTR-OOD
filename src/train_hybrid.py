@@ -11,6 +11,7 @@ from lightning.pytorch.loggers import Logger
 from typing import Any, Dict, List, Optional, Tuple
 from hydra.core.config_store import ConfigStore
 import os
+import torch
 
 from omegaconf import OmegaConf
 
@@ -104,7 +105,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     )
 
     # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    
+    # Load from a pretrained_checkpoint
+    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
+    
     # if ckpt_path exists, load the model from the checkpoint
     if ckpt_path is not None and os.path.exists(ckpt_path):
         print(f'CHECKPOINT PATH EXISTS: {ckpt_path}')
@@ -115,6 +120,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         ckpt_path = None
       
     model = HybridModule.load_from_checkpoint(ckpt_path, net=model.net, datasets=cfg.get("data"), tokenizer=tokenizer) if ckpt_path is not None else model
+    # model = torch.compile(model)
+    
 
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')

@@ -14,6 +14,9 @@ import os
 
 from omegaconf import OmegaConf
 
+# Set precision for torch to bf16
+import torch
+# torch.set_default_tensor_type(torch.BFloat16Tensor)
 
 # import data_config as data_config
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -104,7 +107,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     )
 
     # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    
+    # Load from a pretrained_checkpoint
+    ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
+    
     # if ckpt_path exists, load the model from the checkpoint
     if ckpt_path is not None and os.path.exists(ckpt_path):
         print(f'CHECKPOINT PATH EXISTS: {ckpt_path}')
@@ -118,10 +125,13 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
 
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')
+        model.train()
         trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
     else:
         print(f'MODEL WILL NOT BE TRAINED: {model}. Only testing will be performed.')
+        model.eval()
+        trainer.validate(model, datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
     
     # # Train the model
