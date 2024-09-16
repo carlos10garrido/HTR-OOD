@@ -156,6 +156,10 @@ class MetricLogger():
       pred = self.tokenizer.detokenize(pred)
       label = self.tokenizer.detokenize(label.tolist())
       cer_seq = torchmetrics.text.CharErrorRate()(pred, label)
+      # Clamp to a maximum of 1.0
+      cer_seq = torch.clamp(cer_seq, max=1.0)
+      # Calculated as 1 - CER for calibration
+      cer_seq = 1 - cer_seq
       confidence = self.calculate_confidence(raw_pred)
       calibration = torch.abs(cer_seq - confidence)
       calibrations.append(calibration)
@@ -213,6 +217,10 @@ class MetricLogger():
       pred = self.tokenizer.detokenize(pred)
       label = self.tokenizer.detokenize(label.tolist())
       cer_seq = torchmetrics.text.CharErrorRate()(pred, label)
+      # Clamp to a maximum of 1.0
+      cer_seq = torch.clamp(cer_seq, max=1.0)
+      # Calculated as 1 - CER for calibration
+      cer_seq = 1 - cer_seq
       confidence = self.calculate_confidence(raw_pred)
       calibration = torch.abs(cer_seq - confidence)
       calibrations.append(calibration)
