@@ -1,0 +1,2 @@
+python src/train_transformer.py data/train/train_config/datasets=[wikitext] logger.wandb.name=Transformer-wikitext-aug trainer.max_epochs=1000 model=transformer_big logger.wandb.tags=[wikitext_exp] hparams_search=htr_optuna & \
+python src/train_transformer.py data/train/train_config/datasets=[wikitext] logger.wandb.name=Transformer-wikitext-aug trainer.max_epochs=1000 model=transformer_big logger.wandb.tags=[wikitext_exp] hparams_search=htr_optuna & 
