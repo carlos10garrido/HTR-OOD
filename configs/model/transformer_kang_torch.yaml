@@ -9,20 +9,29 @@ tokenizer: ${tokenizer}
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0002 # 2e-4
-  # weight_decay: 0.001
+  #2 x 10^-4 lr
+  lr: 0.0002
+  # weight_decay: 0.1
 
-# scheduler: 
-#   _target_: torch.optim.lr_scheduler.StepLR
-#   _partial_: true
-#   step_size: 20 # Reduce the learning rate every 20 epochs
-#   gamma: 0.5 # by 0.5 every time
-#   verbose: true
 scheduler: null
-# visualize_attention: False
 
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.SequentialLR
+#   _partial_: true
+#   milestones: [4000]
+#   schedulers: 
+#     - _target_: torch.optim.lr_scheduler.LinearLR
+#       _partial_: true
+#       start_factor: 0.0001
+#       total_iters: 4000
+#       # optimizer: scheduler.optimizer
 
-
+#     - _target_: torch.optim.lr_scheduler.ExponentialLR
+#       _partial_: true
+#       gamma: 0.9999
+#       # optimizer: scheduler.optimizer
+#   verbose: true
+      
 
 net: 
   _target_: src.models.components.transformer_kang_torch.TransformerKangTorch
