@@ -49,7 +49,7 @@ class MetricLogger():
     self.val_confidences = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_calibrations = {val_dataset: [] for val_dataset in self.val_datasets}
     self.val_int_perplexities = {val_dataset: [] for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
-    self.val_ext_perplexities = {val_dataset: torchmetrics.text.Perplexity(ignore_index=2) for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
+    self.val_ext_perplexities = {val_dataset: torchmetrics.text.Perplexity(ignore_index=2).to(device) for val_dataset in self.val_datasets} # Ignore BOS, EOS, PAD
     
     
     # Set test metrics per dataset as a dict()
@@ -58,7 +58,7 @@ class MetricLogger():
     self.test_confidences = {test_dataset: [] for test_dataset in self.test_datasets}
     self.test_calibrations = {test_dataset: [] for test_dataset in self.test_datasets}
     self.test_int_perplexities = {test_dataset: [] for test_dataset in self.test_datasets}
-    self.test_ext_perplexities = {test_dataset: torchmetrics.text.Perplexity(ignore_index=2) for test_dataset in self.test_datasets} # Ignore BOS, EOS, PAD
+    self.test_ext_perplexities = {test_dataset: torchmetrics.text.Perplexity(ignore_index=2).to(device) for test_dataset in self.test_datasets} # Ignore BOS, EOS, PAD
 
     print(f'Train datasets: {self.train_datasets}')
     print(f'Validation datasets: {self.val_datasets}')
