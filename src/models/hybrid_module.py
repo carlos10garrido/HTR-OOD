@@ -28,6 +28,7 @@ class HybridModule(LightningModule):
         _logger: Any,
         datasets: dict,
         tokenizer: Tokenizer,
+        log_val_metrics: bool = True,
     ) -> None:
         """Initialize a `HybridModule`.
 
@@ -40,6 +41,7 @@ class HybridModule(LightningModule):
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)#, ignore=("datasets"))
+        self.log_val_metrics = log_val_metrics
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
@@ -121,13 +123,12 @@ class HybridModule(LightningModule):
           str_train_datasets = f'train_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
 
-        labels = batch[1].permute(1, 0)
-        labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right to remove the <bos> token
-
+        labels = batch[1].permute(1, 0)#.type(torch.LongTensor).to(images.device)
+ 
+        enc_outputs, dec_outputs = self.net(x=images, y=labels[:, :-1])
+        labels = labels[:, 1:].contiguous() # Shift all labels to the right to remove the <bos> token
+        input_lengths = torch.ones(images.shape[0], dtype=torch.long).to(images.device) * enc_outputs.shape[0]
         target_lengths = torch.where(labels == self.tokenizer.eos_id)[1]
-        input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction[-1])) - (padded_cols // self.net.img_reduction[-1]).int().to(images.device)
-
-        enc_outputs, dec_outputs = self.net(x=images, y=labels)
         outputs = dec_outputs
         
         # Check if outputs is an instance of Hugging Face ModelOutput
@@ -135,11 +136,10 @@ class HybridModule(LightningModule):
           logits = outputs.logits
           loss = outputs.loss
         else:
-          logits = outputs[:, :-1]
+          logits = outputs
           loss_ce = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
           loss_enc = self.ctc_criterion(enc_outputs, labels, input_lengths, target_lengths)
           loss = 0.5 * loss_ce + (1 - 0.5) * loss_enc
-          # loss = loss_ce
 
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != self.tokenizer.pad_id).sum()
         self.metric_logger.log_train_step(loss, acc)
@@ -193,7 +193,7 @@ class HybridModule(LightningModule):
         epoch = self.current_epoch
 
         images, labels = batch[0], batch[1]
-        labels = labels.permute(1, 0)
+        labels = labels.permute(1, 0).type(torch.LongTensor)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
 
         if self.current_epoch == 0 and self.global_step <= 1:
@@ -201,18 +201,17 @@ class HybridModule(LightningModule):
           self.metric_logger.log_images(images, str_train_datasets)
         
         preds, raw_preds = self.net.predict_greedy(images)
-        preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right to remove the <bos> token
-        raw_preds = raw_preds[:, 1:].clone().contiguous() # Shift all labels to the right to remove the <bos> token
         
-        self.metric_logger.log_val_step_confidence(raw_preds, dataset)
-        self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
-        self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
-        
-        # Predict as in training to get the perplexity. Basically exponentiate the cross-entropy loss
-        with torch.no_grad():
-          enc_outputs, dec_outputs = self.net(x=images, y=labels)
-        
-        self.metric_logger.log_val_step_ext_perplexity(dec_outputs[:, :-1], labels, dataset)
+        if self.log_val_metrics:
+          self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+          self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
+          self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
+          
+          # Predict as in training to get the perplexity. Basically exponentiate the cross-entropy loss
+          with torch.no_grad():
+            enc_outputs, dec_outputs = self.net(x=images, y=labels)
+          
+          # self.metric_logger.log_val_step_ext_perplexity(dec_outputs, labels, dataset)
         
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -298,7 +297,7 @@ class HybridModule(LightningModule):
 
         images, labels = batch[0], batch[1]
         print(f'images.shape: {images.shape}')
-        labels = labels.permute(1, 0)
+        labels = labels.permute(1, 0).type(torch.LongTensor)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
 
         total_cer_per_batch = 0.0
