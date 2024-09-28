@@ -111,7 +111,8 @@ class TransformerKangTorch(nn.Module):
             dim_feedforward=encoder_ffn_dim,
             dropout=dropout,
             activation=activation_function,
-            batch_first=True
+            batch_first=True,
+            norm_first=True,
         )
 
         self.class_head = nn.Linear(d_model, self.vocab_size)
@@ -139,32 +140,13 @@ class TransformerKangTorch(nn.Module):
           x = x.unsqueeze(2) # unflatten to 3D
         
         x = x.permute(0, 3, 1, 2).squeeze(-1)
-
         x = self.lin_proj(x)
-        src = self.pos_encoding_enc(x)
-
-        # Change inputs_ids type to match labels type
-        input_ids = labels.clone().type_as(labels)
-
         
-        # Add bos to input_ids
-        input_ids = torch.cat([torch.ones(input_ids.shape[0], 1, dtype=torch.int).to(self.device) * self.tokenizer.bos_id, input_ids], dim=-1)
-
+        src = self.pos_encoding_enc(x)
+        input_ids = labels
         tgt = self.pos_encoding_dec(self.text_embedding(input_ids))
-
         tgt_key_padding_mask = input_ids == self.tokenizer.pad_id
         tgt_mask = self.transformer.generate_square_subsequent_mask(input_ids.shape[1]).to(self.device)
-        
-
-        # print(f'src shape: {src.shape}. tgt shape: {tgt.shape}. tgt_mask shape: {tgt_mask.shape}. tgt_key_padding_mask shape: {tgt_key_padding_mask.shape}')
-        # print(f'tgt_key_padding_mask: {tgt_key_padding_mask}')
-
-        # print(f'INSIDE FORWARD')
-        # print(f'input_ids: {input_ids.shape}')
-        # print(f'input_ids[:4]: {input_ids[:4]}')
-
-        # print(f'labels: {labels.shape}')
-        # print(f'labels[:4]: {labels[:4]}')
 
         outputs = self.transformer(
             src=src,
@@ -200,23 +182,20 @@ class TransformerKangTorch(nn.Module):
         
         # Predict manually
         preds = torch.ones((x.shape[0], 1), dtype=torch.int).to(self.device) * self.tokenizer.bos_id
-
-        # breakpoint()
+        raw_preds = []
+        
+        memory = self.transformer.encoder(src)
 
         # Prediction
         for i in range(150):
             tgt = self.pos_encoding_dec(self.text_embedding(preds))
-            
-            outputs = self.transformer(
-                src=src,
-                tgt=tgt, 
-            )
-
+            outputs = self.transformer.decoder(tgt, memory)
             outputs = self.class_head(outputs)
+            raw_preds.append(outputs[:, -1].squeeze(0))
             next_token = outputs[:, -1].argmax(dim=-1).unsqueeze(-1)
             preds = torch.cat([preds, next_token], dim=-1)
 
-        return preds
+        return preds, torch.stack(raw_preds, dim=1)
 
 
 if __name__ == "__main__":
