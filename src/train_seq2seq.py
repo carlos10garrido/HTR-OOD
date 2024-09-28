@@ -108,7 +108,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
 
     # Load a checkpoint if provided from callbacks.model_checkpoint filename
     # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
-    
     # Load from a pretrained_checkpoint
     ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
     
@@ -126,7 +125,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     if model.__class__.__name__ == 'HTRTransformerLitModule':
         model = HTRTransformerLitModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
     elif model.__class__.__name__ == 'Seq2SeqModule':
-        model = Seq2SeqModule.load_from_checkpoint(ckpt_path) if ckpt_path is not None else model
+        model = Seq2SeqModule.load_from_checkpoint(ckpt_path ,datasets=cfg.get("data"), tokenizer=tokenizer, _logger=dict({"wandb": logger[0]})) if ckpt_path is not None else model
     
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')
