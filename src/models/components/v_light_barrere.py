@@ -227,16 +227,11 @@ class V_Light_Barrere(nn.Module):
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
-
-      # Add BOS token to the target
-      y = torch.cat([torch.ones(y.shape[0], 1, dtype=torch.int).to(x.device) * self.tokenizer.bos_id, y], dim=-1).to(x.device)
-      # tgt_padding_mask = y == self.tokenizer.pad_id
-      # tgt_padding_mask = tgt_padding_mask.to(x.device)
       
       tgt_key_padding_mask = (y == self.tokenizer.pad_id).to(x.device)
       
       # Transformer decoder
-      embedding_output = self.char_embedding(y)
+      embedding_output = self.char_embedding(y.to(x.device).long())
 
       # Positional encoding for the decoder
       pe_decoder_output = self.pe_decoder(embedding_output)
@@ -282,6 +277,10 @@ class V_Light_Barrere(nn.Module):
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
       
+      # Initialize output tensor
+      output = torch.ones((x.size(0), 1), dtype=torch.int) * self.tokenizer.bos_id
+      output = output.to(x.device)
+      
       raw_output = []
 
       for i in range(1, 128):
@@ -299,7 +298,7 @@ class V_Light_Barrere(nn.Module):
         output = torch.cat([output, next_token], dim=-1)
 
       # breakpoint()
-      return output, torch.stack(raw_output, dim=1)
+      return output[:, 1:], torch.stack(raw_output, dim=1)
 
 if __name__ == "__main__":
     _ = V_Light_Barrere()
