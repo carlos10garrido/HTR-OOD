@@ -49,7 +49,7 @@ class CharTokenizer(Tokenizer):
 
     def encode(self, text: str) -> List[int]:
         text = self.pre_tokenize(text)
-        return [self.vocab[char] for char in text]
+        return [self.vocab[char] for char in text if char in self.vocab]
 
     def decode(self, token_ids: List[int]) -> str:
         # Remove padding, BOS, and EOS tokens
@@ -59,6 +59,9 @@ class CharTokenizer(Tokenizer):
         for token_id in token_ids:
             if token_id in [EOS_IDX]:
                 break
+            # Filter blank token CTC
+            if token_id == self.vocab_size:
+                continue
             if token_id not in [PAD_IDX, SOS_IDX]:
               _token_ids.append(token_id)
         return "".join([self.ids_to_tokens[i] for i in _token_ids])
