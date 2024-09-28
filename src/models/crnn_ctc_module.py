@@ -28,6 +28,7 @@ class CRNN_CTC_Module(LightningModule):
         _logger: Any,
         datasets: dict,
         tokenizer: Tokenizer,
+        log_val_metrics: bool = False,
     ) -> None:
         """Initialize a `CRNN_CTC_Module`.
 
@@ -42,12 +43,15 @@ class CRNN_CTC_Module(LightningModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False, ignore=("datasets"))
+        # self.save_hyperparameters(logger=False, ignore=("datasets"))
+        self.save_hyperparameters(logger=False, ignore=("datasets", "tokenizer", "_logger"))
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
         self.val_datasets = list(datasets['val']['val_config']['datasets'].keys())
         self.test_datasets = list(datasets['test']['test_config']['datasets'].keys())
+        
+        self.log_val_metrics = log_val_metrics
 
         print(f'self.train_datasets: {self.train_datasets}')
         print(f'self.val_datasets: {self.val_datasets}')
@@ -68,6 +72,7 @@ class CRNN_CTC_Module(LightningModule):
         # metric objects for calculating and averaging accuracy across batches
         log.info(f'Logger in HTRTransformerLitModule: {_logger}. Keys: {list(_logger.keys())}')
         self._logger = _logger[list(_logger.keys())[0]]
+        # self._logger = _logger
 
         # Log train datasets, val datasets and test datasets
         self._logger.log_hyperparams({
@@ -83,6 +88,7 @@ class CRNN_CTC_Module(LightningModule):
 
         self.metric_logger = MetricLogger(
           logger=self._logger,
+          tokenizer=self.tokenizer,
           train_datasets=self.train_datasets,
           val_datasets=self.val_datasets,
           test_datasets=self.test_datasets,
@@ -90,6 +96,7 @@ class CRNN_CTC_Module(LightningModule):
 
         self.metric_logger_minusc = MetricLogger(
           logger=self._logger,
+          tokenizer=self.tokenizer,
           # Append minusc to val_datasets and test_datasets
           train_datasets=[f'{train_dataset}_minusc' for train_dataset in self.train_datasets],
           val_datasets=[f'{val_dataset}_minusc' for val_dataset in self.val_datasets],
@@ -116,7 +123,7 @@ class CRNN_CTC_Module(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         :return: A tensor of losses between model predictions and targets."""
-
+        
         images, labels, padded_cols = batch[0], batch[1], batch[2]
         dataset = self.train_datasets[dataloader_idx]
         # print(f'Images shape: {images.shape}')
@@ -130,16 +137,20 @@ class CRNN_CTC_Module(LightningModule):
         # print(f'target_lengths: {target_lengths}')
         labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
-        # Calculate for CTC the length of the sequence
+        # Calculate for CTC the length of the sequence  
         # Input_lenght: to which column in the image there is information
-        input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction[-1])) - (padded_cols // self.net.img_reduction[-1]).int().to(images.device)
+        # input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction[-1])) - (padded_cols // self.net.img_reduction[-1]).int().to(images.device)
+        
         
         # Arguments CTC LOSS: log_probs, target, input_lenghts, target_lenghts
         # print(f'self.net(images).shape: {self.net(images).shape}')
         preds = self.net(images).log_softmax(-1).permute(1, 0, 2)
+        # input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * preds.shape[0]).to(images.device)
+        input_lengths = torch.LongTensor([preds.size(0)] * images.shape[0])
         loss = self.criterion(preds, labels, input_lengths, target_lengths)
-
         preds_ = preds.clone().permute(1, 0, 2).argmax(-1)
+        
+        
 
         # Log images and predictions
         if batch_idx < 1:
@@ -194,11 +205,14 @@ class CRNN_CTC_Module(LightningModule):
         raw_preds = self.net(images).squeeze(-1).clone()
         
         # Calculate confidence and perplexity
-        # self.metric_logger.log_val_step_confidence(raw_preds, dataset)
-        # self.metric_logger.log_val_step_perplexity(raw_preds, labels, dataset)
+        if self.log_val_metrics:
+          self.metric_logger.log_val_step_confidence(raw_preds, dataset)
         
         preds = raw_preds.clone().argmax(-1)
         
+        self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+        self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
+          
         total_cer_per_batch = 0.0
         # print(f'---VALIDATION STEP----- ended')
         
@@ -221,10 +235,6 @@ class CRNN_CTC_Module(LightningModule):
 
           # Calculate CER
           cer = CER()(_pred, _label)
-          # if batch_idx < 1:
-          #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-          #   self._logger.experiment.log({f'val/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
-
           
           self.metric_logger.log_val_step_cer(_pred, _label, dataset)
           self.metric_logger.log_val_step_wer(_pred, _label, dataset)
@@ -255,7 +265,7 @@ class CRNN_CTC_Module(LightningModule):
           self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
         # Log CER minusc
-        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
+        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cers_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
         for dataset, val_cer in val_cers_minusc.items():
           self.log(f'val/val_cer_minusc_{dataset}', val_cer, sync_dist=True, prog_bar=True)
           
@@ -281,14 +291,15 @@ class CRNN_CTC_Module(LightningModule):
       labels = labels.permute(1, 0)
       labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
       labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
-      # Convert 0, 1 and 2 to 0 (padding token) to 0 
-      # labels[labels < 3] = 0
 
       dataloader_idx = 0 if len(self.test_datasets) == 1 else dataloader_idx
       dataset = self.test_datasets[dataloader_idx]
-
-      preds = self.net(images).squeeze(-1)
-      preds = preds.clone().argmax(-1)
+      
+      raw_preds = self.net(images).squeeze(-1).clone()
+      preds = raw_preds.clone().argmax(-1)
+      
+      self.metric_logger.log_test_step_confidence(raw_preds, dataset)
+      self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
 
       total_cer_per_batch = 0.0
       # print(f'-- TEST STEP----- ended')
