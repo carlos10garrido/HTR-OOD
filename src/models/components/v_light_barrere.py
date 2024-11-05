@@ -185,7 +185,6 @@ class V_Light_Barrere(nn.Module):
           dim_feedforward=intermediate_ffn_dim,
           dropout=dropout,
           batch_first=True,
-          # bias=False,
           norm_first=True
         ),
         num_layers=decoder_layers
@@ -290,9 +289,7 @@ class V_Light_Barrere(nn.Module):
           tgt=pe_decoder_output,
           memory=cross_output,
         )
-        # output = torch.cat([output, self.output(decoder_output).argmax(dim=-1)[:, -1].unsqueeze(-1)], dim=1)
-
-        # next_token = self.output(decoder_output)[:,-1,:].argmax(dim=-1).unsqueeze(-1)
+        
         raw_output.append(self.output(decoder_output)[:,-1,:])
         next_token = self.output(decoder_output)[:,-1].argmax(dim=-1).unsqueeze(-1)
         output = torch.cat([output, next_token], dim=-1)
