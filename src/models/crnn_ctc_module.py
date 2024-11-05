@@ -134,23 +134,14 @@ class CRNN_CTC_Module(LightningModule):
         y = batch[1].permute(1, 0)
         labels = y[:, 1:].clone().contiguous() # Shift all labels to the right
         target_lengths = torch.where(labels == self.tokenizer.eos_id)[1]
-        # print(f'target_lengths: {target_lengths}')
-        labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         # Calculate for CTC the length of the sequence  
         # Input_lenght: to which column in the image there is information
-        # input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * (images.shape[-1]  // self.net.img_reduction[-1])) - (padded_cols // self.net.img_reduction[-1]).int().to(images.device)
-        
-        
-        # Arguments CTC LOSS: log_probs, target, input_lenghts, target_lenghts
-        # print(f'self.net(images).shape: {self.net(images).shape}')
         preds = self.net(images).log_softmax(-1).permute(1, 0, 2)
-        # input_lengths = (torch.ones(images.shape[0], dtype=torch.long).to(images.device) * preds.shape[0]).to(images.device)
         input_lengths = torch.LongTensor([preds.size(0)] * images.shape[0])
         loss = self.criterion(preds, labels, input_lengths, target_lengths)
         preds_ = preds.clone().permute(1, 0, 2).argmax(-1)
-        
-        
+
 
         # Log images and predictions
         if batch_idx < 1:
@@ -162,14 +153,6 @@ class CRNN_CTC_Module(LightningModule):
             _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
             cer = CER()(_pred, _label)
-
-            # Log training image and predictions
-            # orig_image = torchvision.utils.make_grid(images[i].detach().cpu(), nrow=1, normalize=True)
-            # orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            # self._logger.experiment.log({f'train/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
-
-            # Write image on disk to check if it is correct
-            # orig_image.save(f'./outputs/train_image_{batch_idx}_{i}.png')
 
         self.metric_logger.log_train_step(loss, torch.tensor([0.0]))
 
@@ -199,7 +182,6 @@ class CRNN_CTC_Module(LightningModule):
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
-        # labels = labels[:, :-1].clone().contiguous() # Remove last label (it is the <eos> token)
 
         dataset = self.val_datasets[dataloader_idx]
         raw_preds = self.net(images).squeeze(-1).clone()
@@ -224,7 +206,7 @@ class CRNN_CTC_Module(LightningModule):
           # _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
           _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
-          print(f'Label: {_label} - Pred: {_pred}')
+          # print(f'Label: {_label} - Pred: {_pred}')
 
           # Calculate CER converting mayus to minus
           _label_minus = _label.lower()
@@ -321,10 +303,10 @@ class CRNN_CTC_Module(LightningModule):
 
         # Calculate CER
         cer = CER()(_pred, _label)
-        if batch_idx < 1:
-          orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-          # self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(image_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
-          self._logger.experiment.log({f'test/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
+        # if batch_idx < 1:
+        #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+        #   # self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(image_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
+        #   self._logger.experiment.log({f'test/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
 
         
         self.metric_logger.log_test_step_cer(_pred, _label, dataset)
