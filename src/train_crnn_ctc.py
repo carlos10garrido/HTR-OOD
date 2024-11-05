@@ -131,7 +131,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     else:
         print(f'MODEL WILL NOT BE TRAINED: {model}. Only testing will be performed.')
         model.eval()
-        trainer.validate(model, datamodule.val_dataloader())
+        # trainer.validate(model, datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
     
     # # Train the model
