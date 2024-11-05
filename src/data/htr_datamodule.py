@@ -206,7 +206,7 @@ class HTRDatasetSynth(Dataset):
 
                 generated = True
             except Exception as e:
-                print(f'Exception {e} while generating image with sequence {sequence} and font {font}.')
+                # print(f'Exception {e} while generating image with sequence {sequence} and font {font}.')
                 sequence = np.random.choice(self.sequences)
                 sequence = sequence.replace("\n", "")
                 sequence = unidecode(sequence)
@@ -438,8 +438,8 @@ class HTRDataModule(pl.LightningDataModule):
             pin_memory=self.val_config.pin_memory,
             collate_fn=lambda batch: collate_fn(batch, img_size=self.train_config.img_size, text_transform=self.text_transform),
             sampler=self.val_sampler if self.val_sampler is not None else None
-        ) for dataset in self.val_dataset]
-        # ) for dataset in [self.train_dataset]] # For overfitting purposes
+        ) for dataset in self.val_dataset] 
+        # ) for dataset in [self.train_dataset]] # For overfitting/debugging purposes
 
     def test_dataloader(self):
         return [DataLoader(
