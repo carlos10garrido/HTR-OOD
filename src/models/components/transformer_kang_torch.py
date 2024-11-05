@@ -120,7 +120,7 @@ class TransformerKangTorch(nn.Module):
         # Initialize parameters as a normal distribution
         for p in self.parameters():
           if p.dim() > 1:
-              nn.init.xavier_normal_(p)
+              nn.init.xavier_uniform_(p)
 
       
     def forward(self, images: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
@@ -143,10 +143,9 @@ class TransformerKangTorch(nn.Module):
         x = self.lin_proj(x)
         
         src = self.pos_encoding_enc(x)
-        input_ids = labels
-        tgt = self.pos_encoding_dec(self.text_embedding(input_ids))
-        tgt_key_padding_mask = input_ids == self.tokenizer.pad_id
-        tgt_mask = self.transformer.generate_square_subsequent_mask(input_ids.shape[1]).to(self.device)
+        tgt = self.pos_encoding_dec(self.text_embedding(labels))
+        tgt_key_padding_mask = (labels == self.tokenizer.pad_id)
+        tgt_mask = self.transformer.generate_square_subsequent_mask(labels.shape[1]).to(self.device)
 
         outputs = self.transformer(
             src=src,
@@ -181,13 +180,13 @@ class TransformerKangTorch(nn.Module):
         src = self.pos_encoding_enc(x)
         
         # Predict manually
-        preds = torch.ones((x.shape[0], 1), dtype=torch.int).to(self.device) * self.tokenizer.bos_id
+        preds = torch.ones((x.shape[0], 1), dtype=torch.int, device=self.device) * self.tokenizer.bos_id
         raw_preds = []
         
         memory = self.transformer.encoder(src)
 
         # Prediction
-        for i in range(150):
+        for i in range(130):
             tgt = self.pos_encoding_dec(self.text_embedding(preds))
             outputs = self.transformer.decoder(tgt, memory)
             outputs = self.class_head(outputs)
