@@ -116,7 +116,7 @@ class MetricLogger():
       confidence = self.calculate_confidence(raw_pred)
       confidences.append(confidence)
     
-    print(f'Confidences: {confidences}')
+    # print(f'Confidences: {confidences}')
     self.val_confidences[dataset].extend(confidences)
     
     return confidences
@@ -134,7 +134,7 @@ class MetricLogger():
       perplexity = 2 ** (-1/len(raw_pred) * torch.log(torch.prod(raw_pred, dtype=torch.float64))) # Perplexity = 2^(-1/N * log(P(x))). Float64 to avoid overflow
       perplexities.append(perplexity)
       
-    print(f'Perplexities: {perplexities}')
+    # print(f'Perplexities: {perplexities}')
     self.val_int_perplexities[dataset].extend(perplexities)
     
     
@@ -145,7 +145,7 @@ class MetricLogger():
         
     """
     ext_perp = self.val_ext_perplexities[dataset].forward(preds, labels)
-    print(f'Ext perp {ext_perp}')
+    # print(f'Ext perp {ext_perp}')
       
     
   def log_val_step_calibration(self, raw_preds, labels, dataset):
@@ -159,9 +159,9 @@ class MetricLogger():
       # Clamp to a maximum of 1.0
       cer_seq = torch.clamp(cer_seq, max=1.0)
       # Calculated as 1 - CER for calibration
-      cer_seq = 1 - cer_seq
+      error_seq = 1 - cer_seq
       confidence = self.calculate_confidence(raw_pred)
-      calibration = torch.abs(cer_seq - confidence)
+      calibration = torch.abs(confidence - error_seq)
       calibrations.append(calibration)
       
     self.val_calibrations[dataset].extend(calibrations)
@@ -177,7 +177,7 @@ class MetricLogger():
       confidence = self.calculate_confidence(raw_pred)
       confidences.append(confidence)
     
-    print(f'Confidences: {confidences}')
+    # print(f'Confidences: {confidences}')
     self.test_confidences[dataset].extend(confidences)
     
     return confidences
@@ -195,7 +195,7 @@ class MetricLogger():
       perplexity = 2 ** (-1/len(raw_pred) * torch.log(torch.prod(raw_pred, dtype=torch.float64))) # Perplexity = 2^(-1/N * log(P(x))). Float64 to avoid overflow
       perplexities.append(perplexity)
       
-    print(f'Perplexities: {perplexities}')
+    # print(f'Perplexities: {perplexities}')
     self.test_int_perplexities[dataset].extend(perplexities)
     
     
@@ -206,7 +206,7 @@ class MetricLogger():
         
     """
     ext_perp = self.test_ext_perplexities[dataset].forward(raw_preds, labels)
-    print(f'Ext perp {ext_perp}')
+    # print(f'Ext perp {ext_perp}')
       
     
   def log_test_step_calibration(self, raw_preds, labels, dataset):
@@ -220,9 +220,9 @@ class MetricLogger():
       # Clamp to a maximum of 1.0
       cer_seq = torch.clamp(cer_seq, max=1.0)
       # Calculated as 1 - CER for calibration
-      cer_seq = 1 - cer_seq
+      error_seq = 1 - cer_seq
       confidence = self.calculate_confidence(raw_pred)
-      calibration = torch.abs(cer_seq - confidence)
+      calibration = torch.abs(confidence - error_seq)
       calibrations.append(calibration)
       
     self.test_calibrations[dataset].extend(calibrations)
