@@ -28,7 +28,7 @@ class HybridModule(LightningModule):
         _logger: Any,
         datasets: dict,
         tokenizer: Tokenizer,
-        log_val_metrics: bool = True,
+        log_val_metrics: bool = False,
     ) -> None:
         """Initialize a `HybridModule`.
 
@@ -123,7 +123,7 @@ class HybridModule(LightningModule):
           str_train_datasets = f'train_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
 
-        labels = batch[1].permute(1, 0)#.type(torch.LongTensor).to(images.device)
+        labels = batch[1].permute(1, 0).type(torch.LongTensor).to(images.device)
  
         enc_outputs, dec_outputs = self.net(x=images, y=labels[:, :-1])
         labels = labels[:, 1:].contiguous() # Shift all labels to the right to remove the <bos> token
@@ -140,6 +140,8 @@ class HybridModule(LightningModule):
           loss_ce = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
           loss_enc = self.ctc_criterion(enc_outputs, labels, input_lengths, target_lengths)
           loss = 0.5 * loss_ce + (1 - 0.5) * loss_enc
+          # loss = loss_ce
+          # loss = loss_enc
 
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != self.tokenizer.pad_id).sum()
         self.metric_logger.log_train_step(loss, acc)
@@ -194,11 +196,11 @@ class HybridModule(LightningModule):
 
         images, labels = batch[0], batch[1]
         labels = labels.permute(1, 0).type(torch.LongTensor)
-        labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
+        labels = labels[:, 1:].contiguous() # Shift all labels to the right
 
         if self.current_epoch == 0 and self.global_step <= 1:
           str_train_datasets = f'val_' + ', '.join(self.train_datasets)
-          self.metric_logger.log_images(images, str_train_datasets)
+          # self.metric_logger.log_images(images, str_train_datasets)
         
         preds, raw_preds = self.net.predict_greedy(images)
         
@@ -215,7 +217,7 @@ class HybridModule(LightningModule):
         
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
-          images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
+          # images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
           _label = labels[i].detach().cpu().numpy().tolist()
           _pred = preds[i].tolist()
 
@@ -233,8 +235,8 @@ class HybridModule(LightningModule):
 
           cer = CER()(_pred, _label)
           
-          if batch_idx < 1:
-            print(f'VAL Label: {_label}. Pred: {_pred}')
+          # if batch_idx < 1:
+          #   print(f'VAL Label: {_label}. Pred: {_pred}')
             # self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
 
@@ -296,32 +298,29 @@ class HybridModule(LightningModule):
         epoch = self.current_epoch
 
         images, labels = batch[0], batch[1]
-        print(f'images.shape: {images.shape}')
+        # print(f'images.shape: {images.shape}')
         labels = labels.permute(1, 0).type(torch.LongTensor)
         labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
 
         total_cer_per_batch = 0.0
 
-        if self.current_epoch == 0 and self.global_step <= 1:
-          str_train_datasets = f'test_' + ', '.join(self.train_datasets)
-          self.metric_logger.log_images(images, str_train_datasets)
-        
-        # preds = self.net.predict_greedy(images)#.sequences
-        # preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right
+        # if self.current_epoch == 0 and self.global_step <= 1:
+        #   str_train_datasets = f'test_' + ', '.join(self.train_datasets)
+        #   self.metric_logger.log_images(images, str_train_datasets)
         
         preds, raw_preds = self.net.predict_greedy(images)
-        preds = preds[:, 1:].clone().contiguous() # Shift all labels to the right to remove the <bos> token
-        raw_preds = raw_preds[:, 1:].clone().contiguous() # Shift all labels to the right to remove the <bos> token
+        
+        # breakpoint()
         
         self.metric_logger.log_test_step_confidence(raw_preds, dataset)
         self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
         self.metric_logger.log_test_step_int_perplexity(raw_preds, dataset)
         
         # Predict as in training to get the perplexity. Basically exponentiate the cross-entropy loss
-        with torch.no_grad():
-          enc_outputs, dec_outputs = self.net(x=images, y=labels)
+        # with torch.no_grad():
+        #   enc_outputs, dec_outputs = self.net(x=images, y=labels)
         
-        self.metric_logger.log_test_step_ext_perplexity(dec_outputs[:, :-1], labels, dataset)
+        # self.metric_logger.log_test_step_ext_perplexity(dec_outputs[:, :-1], labels, dataset)
         
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -334,15 +333,15 @@ class HybridModule(LightningModule):
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
 
-          print(f'TEST Label: {_label}. Pred: {_pred}')
+          # print(f'TEST Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
-          if batch_idx < 1:
-            self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+          # if batch_idx < 1:
+          #   self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
           total_cer_per_batch += cer
         
-        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
+        # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
     def on_test_epoch_end(self) -> None:
         test_cer, test_wer = self.metric_logger.log_test_metrics()
@@ -402,7 +401,10 @@ class HybridModule(LightningModule):
                 schedulers=schedulers
                 )
             else:
-              scheduler = self.hparams.scheduler(optimizer=optimizer)
+            # if len(self.hparams.scheduler) == 1:
+              scheduler = self.hparams.scheduler[0](optimizer=optimizer)
+              
+            # scheduler = self.hparams.scheduler(optimizer=optimizer)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
