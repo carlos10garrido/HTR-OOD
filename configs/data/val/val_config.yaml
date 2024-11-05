@@ -6,9 +6,9 @@ defaults:
 val_config:
   _target_: src.data.data_config.DataConfig
   stage: val
-  img_size: [64,128]
+  img_size: ${data.train.train_config.img_size}
   binarize: ${data.train.train_config.binarize} # Use the same binarize value as in train
-  batch_size: 32
-  num_workers: 4
+  batch_size: ${data.train.train_config.batch_size}
+  num_workers: ${data.train.train_config.num_workers}
   pin_memory: True
   vocab_path: ${paths.data_dir}/vocab.txt
