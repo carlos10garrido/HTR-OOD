@@ -47,6 +47,7 @@ class Seq2SeqModule(LightningModule):
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False, ignore=("datasets", "tokenizer", "_logger"))
         self.log_val_metrics = log_val_metrics
+        print(f'Loggin val metrics: {self.log_val_metrics}')
 
         # Save datasets names in a list to index from validation_step
         self.train_datasets = list(datasets['train']['train_config']['datasets'].keys())
@@ -66,11 +67,8 @@ class Seq2SeqModule(LightningModule):
         self.tokenizer = tokenizer
 
         # loss function
-        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id) # 1 is the padding token
-        
-        # add label smoothing of 0.4 for transformer kang
-        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id, label_smoothing=0.4)
-        # self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id)
+        # add label smoothing of 0.4 for transformers
+        self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id, label_smoothing=0.4) if self.net.__class__.__name__ == 'TransformerKangTorch' else torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id)
 
         # metric objects for calculating and averaging accuracy across batches
         log.info(f'Logger in Seq2SeqModule: {_logger}. Keys: {list(_logger.keys())}')
@@ -131,7 +129,7 @@ class Seq2SeqModule(LightningModule):
           str_train_datasets = f'train_' + ', '.join(self.train_datasets)
           self.metric_logger.log_images(images, str_train_datasets)
 
-        labels = batch[1].permute(1, 0)
+        labels = batch[1].permute(1, 0).type(torch.LongTensor).to(self.device)
         outputs = self.net(images, labels[:, :-1]) # Remove last label (it is the <eos> token)
         labels = labels[:, 1:].contiguous() # Shift all labels to the right as causal sequence modeling
 
@@ -141,27 +139,12 @@ class Seq2SeqModule(LightningModule):
           loss = outputs.loss
         else:
           logits = outputs
-          loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
+          
+        loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
         
         # print(f'loss: {loss}')
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
-
-        # print argmax predictions
-        preds = logits.argmax(-1)
-
-        if batch_idx < 2:
-          for i in range(images.shape[0]):
-            # images_ = self.metric_logger.log_images(images[i], f'train/training_images_{self.train_datasets[0]}')
-            # images_ = images[i]
-            images_ = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-            _label = labels[i].detach().cpu().numpy().tolist()
-            _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
-            _pred = logits[i].argmax(-1).detach().cpu().numpy().tolist()
-            _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
-            print(f'Label: {_label}. Pred: {_pred}')
-            cer = CER()(_pred, _label)
-            # self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
         # update and log metrics
         self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
@@ -183,8 +166,6 @@ class Seq2SeqModule(LightningModule):
 
         pass
 
-    
-
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
         """Perform a single validation step on a batch of data from the validation set.
 
@@ -198,104 +179,114 @@ class Seq2SeqModule(LightningModule):
 
         # Get epoch
         epoch = self.current_epoch
-
-        images, labels = batch[0], batch[1]
-        labels = labels.permute(1, 0)
-        labels = labels[:, 1:].contiguous() # Shift all labels to the right
-
-        total_cer_per_batch = 0.0
-
-        if self.current_epoch == 0 and self.global_step <= 1:
-          str_train_datasets = f'val_' + ', '.join(self.train_datasets)
-          self.metric_logger.log_images(images, str_train_datasets)
-
-        preds, raw_preds = self.net.predict_greedy(images)
-        raw_preds = raw_preds.squeeze(-1)
-        preds = preds.sequences if hasattr(preds, 'sequences') else preds[:, 1:].clone().contiguous() # Shift all labels to the right 
         
-        if self.log_val_metrics:
-          self.metric_logger.log_val_step_confidence(raw_preds, dataset)
-          self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
-          self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
+        # if epoch >= 300:
+        if epoch >= -1:
+          images, labels = batch[0], batch[1]
+          labels = labels.permute(1, 0)
+          labels = labels[:, 1:].contiguous() # Shift all labels to the right
+
+          total_cer_per_batch = 0.0
+
+          if self.current_epoch == 0 and self.global_step <= 1:
+            str_train_datasets = f'val_' + ', '.join(self.train_datasets)
+            # self.metric_logger.log_images(images, str_train_datasets)
+
+          preds, raw_preds = self.net.predict_greedy(images)
+          preds = preds.sequences if hasattr(preds, 'sequences') else preds
+          raw_preds = raw_preds.squeeze(-1)
           
-          # with torch.no_grad():
-          #   _preds = self.net(images, labels)
-          # self.metric_logger.log_val_step_ext_perplexity(_preds[:, :-1], labels, dataset)
-          
-        
-        preds_str, labels_str = [], []
-        for i in range(images.shape[0]):
-          # images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
-          _label = labels[i].detach().cpu().numpy().tolist()
-          # _pred = preds.sequences[i].tolist()
-          _pred = preds[i].tolist()
+          if self.log_val_metrics:
+            self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+            self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
+            self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
 
-          _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
-          _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
-          
-          self.metric_logger.log_val_step_cer(_pred, _label, dataset)
-          self.metric_logger.log_val_step_wer(_pred, _label, dataset)
-          _pred_minus = _pred.lower()
-          _label_minus = _label.lower()
+          for i in range(images.shape[0]):
+            _label = labels[i].detach().cpu().numpy().tolist()
+            _pred = preds[i].tolist()
 
-          self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
-          self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
+            _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
+            _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
+            
+            # if batch_idx < 1:
+            #   print(f'VAL Label: {_label}. Pred: {_pred}')
+            
+            self.metric_logger.log_val_step_cer(_pred, _label, dataset)
+            self.metric_logger.log_val_step_wer(_pred, _label, dataset)
+            _pred_minus, _label_minus = _pred.lower(), _label.lower()
 
-          # print(f'VAL Label: {_label}. Pred: {_pred}')
-          cer = CER()(_pred, _label)
-          
-          if batch_idx < 1:
-            print(f'VAL Label: {_label}. Pred: {_pred}')
-            # self._logger.experiment.log({f'val/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+            self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
+            self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
 
-
-          total_cer_per_batch += cer
-        
-        # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
-
-
+            cer = CER()(_pred, _label)
+            total_cer_per_batch += cer
+        else:
+          # print(f'Epoch: {epoch}. Skipping validation step for epoch < 100')
+          pass
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
+        
+        epoch = self.current_epoch
+        
+        # if epoch >= 300:
+        if epoch >= -1:
 
-        mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cers = self.metric_logger.log_val_metrics()
-        for dataset, val_cer in val_cers.items():
-            self.log(f'val/val_cer_{dataset}', val_cer, sync_dist=True, prog_bar=True)
-        
-        print(f'mean_val_cer: {mean_val_cer}')
-        self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
-        self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
-        self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        
-        for name, heldout_domain_cer in heldout_domain_cers.items():
-          # Check if heldout_domain_cer is a tensor or list
-          if isinstance(heldout_domain_cer, torch.Tensor):
-            heldout_domain_cer = heldout_domain_cer.item()
-          if isinstance(heldout_domain_cer, list):
-            heldout_domain_cer = heldout_domain_cer[0].item()
-
-          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
-        
-        # Log CER minusc
-        mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
-        for dataset, val_cer in val_cers_minusc.items():
-          self.log(f'val/val_cer_minusc_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+          mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cers = self.metric_logger.log_val_metrics()
+          for dataset, val_cer in val_cers.items():
+              self.log(f'val/val_cer_{dataset}', val_cer, sync_dist=True, prog_bar=True)
           
-        self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
-        self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
-        # self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
-        for name, heldout_domain_cer in heldout_domain_cer_minus.items():
-          # Check if heldout_domain_cer is a tensor or list
-          if isinstance(heldout_domain_cer, torch.Tensor):
-            heldout_domain_cer = heldout_domain_cer.item()
-          if isinstance(heldout_domain_cer, list):
-            heldout_domain_cer = heldout_domain_cer[0].item()
-          self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
+          print(f'mean_val_cer: {mean_val_cer}')
+          self.log(f'val/mean_cer', mean_val_cer, sync_dist=True, prog_bar=True)
+          self.log(f'val/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
+          self.log(f'val/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
+          
+          for name, heldout_domain_cer in heldout_domain_cers.items():
+            # Check if heldout_domain_cer is a tensor or list
+            if isinstance(heldout_domain_cer, torch.Tensor):
+              heldout_domain_cer = heldout_domain_cer.item()
+            if isinstance(heldout_domain_cer, list):
+              heldout_domain_cer = heldout_domain_cer[0].item()
+
+            self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
+          
+          # Log CER minusc
+          mean_val_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus, val_cers_minusc = self.metric_logger_minusc.log_val_metrics()
+          for dataset, val_cer in val_cers_minusc.items():
+            self.log(f'val/val_cer_minusc_{dataset}', val_cer, sync_dist=True, prog_bar=True)
+            
+          self.log(f'val/mean_cer_minusc', mean_val_cer_minus, sync_dist=True, prog_bar=True)
+          self.log(f'val/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
+          self.log(f'val/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
+          # self.log(f'val/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
+          for name, heldout_domain_cer in heldout_domain_cer_minus.items():
+            # Check if heldout_domain_cer is a tensor or list
+            if isinstance(heldout_domain_cer, torch.Tensor):
+              heldout_domain_cer = heldout_domain_cer.item()
+            if isinstance(heldout_domain_cer, list):
+              heldout_domain_cer = heldout_domain_cer[0].item()
+            self.log(f'val/heldout_target_{name}', heldout_domain_cer, sync_dist=True, prog_bar=True)
 
 
-        self.metric_logger.update_epoch(self.current_epoch)
-        self.metric_logger_minusc.update_epoch(self.current_epoch)
+          self.metric_logger.update_epoch(self.current_epoch)
+          self.metric_logger_minusc.update_epoch(self.current_epoch)
+        else:
+          print(f'Epoch: {epoch}. Skipping validation epoch end for epoch < 100. Setting all metrics to 1.0')
+          for dataset in self.val_datasets:
+            self.log(f'val/val_cer_{dataset}', 1.0, sync_dist=True, prog_bar=True)
+            self.log(f'val/val_cer_minusc_{dataset}', 1.0, sync_dist=True, prog_bar=True)
+            
+          self.log(f'val/mean_cer', 1.0, sync_dist=True, prog_bar=True)
+          self.log(f'val/in_domain_cer', 1.0, sync_dist=True, prog_bar=True)
+          self.log(f'val/out_of_domain_cer', 1.0, sync_dist=True, prog_bar=True)
+          self.log(f'val/mean_cer_minusc', 1.0, sync_dist=True, prog_bar=True)
+          self.log(f'val/in_domain_cer_minusc', 1.0, sync_dist=True, prog_bar=True)
+          self.log(f'val/out_of_domain_cer_minusc', 1.0, sync_dist=True, prog_bar=True)
+          
+          for name in self.val_datasets:
+            self.log(f'val/heldout_target_{name}', 1.0, sync_dist=True, prog_bar=True)
+            self.log(f'val/heldout_target_{name}_minusc', 1.0, sync_dist=True, prog_bar=True)
+
 
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
@@ -320,10 +311,10 @@ class Seq2SeqModule(LightningModule):
 
         if self.current_epoch == 0 and self.global_step <= 1:
           str_train_datasets = f'test_' + ', '.join(self.train_datasets)
-          self.metric_logger.log_images(images, str_train_datasets)
+          # self.metric_logger.log_images(images, str_train_datasets)
         
         preds, raw_preds = self.net.predict_greedy(images)#.sequences
-        preds = preds.sequences if hasattr(preds, 'sequences') else preds[:, 1:].clone().contiguous() # Shift all labels to the right 
+        preds = preds.sequences if hasattr(preds, 'sequences') else preds
         
         self.metric_logger.log_test_step_confidence(raw_preds, dataset)
         self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
@@ -346,15 +337,15 @@ class Seq2SeqModule(LightningModule):
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
 
-          print(f'TEST Label: {_label}. Pred: {_pred}')
+          # print(f'TEST Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
-          if batch_idx < 1:
-            self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
+          # if batch_idx < 1:
+          #   self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(images[i], caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
           total_cer_per_batch += cer
         
-        print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
+        # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
 
     def on_test_epoch_end(self) -> None:
         test_cer, test_wer = self.metric_logger.log_test_metrics()
