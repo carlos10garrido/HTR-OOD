@@ -1,10 +1,11 @@
 # #!/bin/bash
 
 # Schedule execution of many runs
-model_name=$1
-dataset_src=$2
-img_size=$3
-batch_size=$4
+python_module=$1
+model_name=$2
+dataset_src=$3
+img_size=$4
+batch_size=$5
 
 
 # Get all the checkpoints containing that model inside checkpoints folder
@@ -13,11 +14,10 @@ echo "Searching for checkpoints containing $model_name"
 echo "Model name: $model_name"
 echo "image size: $img_size"
 
-checkpoints=$(ls checkpoints/ | grep $model_name | grep src_$dataset_src)
+checkpoints=$(ls checkpoints/ | grep "\b$model_name" | grep src_$dataset_src)
 
 echo "Number of checkpoints found: $(echo $checkpoints | wc -w)"
-
-# echo "Checkpoints found: $checkpoints"
+echo "Checkpoints found: $checkpoints"
 
 
 for checkpoint in $checkpoints
@@ -26,7 +26,7 @@ do
   model_name_without_ckpt=$(echo $checkpoint | sed 's/.ckpt//')
   echo "Checkpoint: $checkpoint"
   # Test for each src ID
-  eval="python src/train_crnn_ctc.py 
+  eval="python $python_module \
       data/train/train_config/datasets=[$dataset_src] \
       data.train.train_config.img_size=$img_size \
       data.train.train_config.batch_size=$batch_size \
@@ -40,6 +40,8 @@ do
       logger.wandb.offline=False \
       logger.wandb.name=${model_name_without_ckpt}_test \
       data.train.train_config.binarize=True \
+      data.train.train_config.num_workers=16 \
+      +trainer.precision="bf16-mixed" \
       train=False"
   echo $eval
   eval $eval
