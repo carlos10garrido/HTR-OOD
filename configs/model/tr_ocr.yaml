@@ -35,21 +35,20 @@ scheduler: null
 #   verbose: true
       
 net: 
-  _target_: src.models.components.transformer_kang_torch.TransformerKangTorch
-  use_backbone: True
-  patch_per_column: True
+  _target_: src.models.components.tr_ocr.TransformerOCR
+  use_backbone: False
+  patch_per_column: False
   image_size: ${data.train.train_config.img_size}
-  encoder_layers: 4
+  encoder_layers: 12
   encoder_attention_heads: 8
   encoder_ffn_dim: 1024
-  patch_size: 1
-  # vocab_size: 101
+  patch_size: 16
   d_model: 1024
   dropout: 0.1
-  decoder_layers: 4
+  decoder_layers: 12
   decoder_attention_heads: 8
   decoder_ffn_dim: 1024
-  activation_function: 'relu'
+  activation_function: 'gelu'
   tokenizer: ${tokenizer}
 
 compile: false

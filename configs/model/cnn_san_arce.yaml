@@ -8,16 +8,17 @@ tokenizer: ${tokenizer}
 optimizer:
   _target_: torch.optim.RMSprop
   _partial_: true
-  lr: 0.0003 
+  lr: 0.0003
 
-scheduler: null 
-  #  We use an initial learning rate of 0.001 and apply a cosine-like decay 
-  # in the final 50 epochs to finetune the parameters of the network.
-  # _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  # _partial_: true
-  # mode: min
-  # factor: 0.1
-  # patience: 10
+# scheduler: 
+#   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+#   _partial_: true
+#   mode: min
+#   factor: 0.2
+#   patience: 15
+#   verbose: true
+
+scheduler: null
 
 net: 
   _target_: src.models.components.cnn_san_arce.CNN_SAN_Arce
@@ -30,4 +31,4 @@ net:
   d_model: 192
   hidden_dim: 512
 
-compile: falses
+compile: false

@@ -18,7 +18,7 @@ scheduler: null
   # factor: 0.1
   # patience: 10
 
-visualize_attention: False
+# visualize_attention: False
 
 
 net: 
