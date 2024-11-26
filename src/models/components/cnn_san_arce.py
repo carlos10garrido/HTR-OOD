@@ -113,7 +113,7 @@ class CNN_SAN_Arce(nn.Module):
         x = self.embedding_encoder(x)
         # x = self.pe_encoder(x)        
         x = self.self_attention(x)
-        x = self.class_head(x)
+        x = self.class_head(x)  
 
         return x
 

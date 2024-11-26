@@ -175,7 +175,7 @@ class CRNN_Michael(nn.Module):
       cnn_output = self.ctc_pred(x)
       x = self.conv1d(cnn_output)
       x = self.pe_cross(x)
-      encoder_outputs = x.clone()
+      encoder_outputs = x#.clone()
 
       # Decoder 
       batch_size, dec_sequence_length = y.size()
@@ -183,7 +183,9 @@ class CRNN_Michael(nn.Module):
       # Layers_decoder = 1 for this particular model
       h = self.init_h(x.shape[0], self.hidden_size, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous().requires_grad_()
       c = torch.zeros(x.shape[0], self.layers_decoder, self.hidden_size).to(x.device).permute(1, 0, 2).contiguous().requires_grad_()
-      logit_list = []
+      # logit_list = []
+      
+      logit_list = torch.zeros((batch_size, dec_sequence_length, self.vocab_size), dtype=torch.float32, requires_grad=True).to(x.device)
       
       # Flatten parameters
       self.decoder.flatten_parameters()
@@ -206,9 +208,11 @@ class CRNN_Michael(nn.Module):
           
           # [batch_size, vocab_size]
           logit = self.output(out).squeeze(0) # Predict the next character
-          logit_list.append(logit)
+          # logit_list.append(logit)
+          logit_list[:, i] = logit.squeeze(1)
 
-      return cnn_output.log_softmax(-1).permute(1, 0, 2), torch.stack(logit_list, dim=1).squeeze(-2)
+      # return cnn_output.log_softmax(-1).permute(1, 0, 2)#, torch.stack(logit_list, dim=1).squeeze(-2)
+      return cnn_output.log_softmax(-1).permute(1, 0, 2), logit_list
       # return torch.stack(logit_list, dim=1) # Only for seq2seq training
 
 
@@ -224,7 +228,7 @@ class CRNN_Michael(nn.Module):
       cnn_output = self.ctc_pred(x)
       x = self.conv1d(cnn_output)
       x = self.pe_cross(x)
-      encoder_outputs = x.clone()
+      encoder_outputs = x#.clone()
       
       # Decoder
       batch_size, enc_sequence_length, enc_dim = x.size()
@@ -233,6 +237,9 @@ class CRNN_Michael(nn.Module):
       h = self.init_h(x.shape[0], self.hidden_size, self.layers_decoder).to(x.device).permute(1, 0, 2).contiguous()
       c = torch.zeros(x.shape[0], self.layers_decoder, self.hidden_size).to(x.device).permute(1, 0, 2).contiguous()
       output_list, raw_preds = [], []
+      
+      raw_preds = torch.zeros((batch_size, 120, self.vocab_size), dtype=torch.float32, requires_grad=False).to(x.device)
+      output_list = torch.zeros((batch_size, 120), dtype=torch.long).to(x.device)
       
       # Flatten parameters
       self.decoder.flatten_parameters()
@@ -249,14 +256,17 @@ class CRNN_Michael(nn.Module):
           
           # [batch_size, vocab_size]
           logit = self.output(out).squeeze(0) # Predict the next character
-          raw_preds.append(logit)
+          # raw_preds.append(logit)
+          raw_preds[:, i] = logit.squeeze(1)
 
           # Greedy Decoding
           logit = torch.argmax(logit, dim=-1)
           output = logit #.unsqueeze(1) # [batch_size] - [batch_size, 1]
-          output_list.append(logit)
+          # output_list.append(logit)
+          output_list[:, i] = logit.squeeze(1)
           
-      return torch.stack(output_list, dim=1).squeeze(-1), torch.stack(raw_preds, dim=1).squeeze(-2)
+      # return torch.stack(output_list, dim=1).squeeze(-1), torch.stack(raw_preds, dim=1).squeeze(-2)
+      return output_list.detach(), raw_preds.detach()
 
 if __name__ == "__main__":
     _ = CRNN_Michael()
