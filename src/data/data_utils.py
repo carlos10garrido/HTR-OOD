@@ -26,17 +26,18 @@ def read_htr_fonts(fonts_path):
   return fonts
     
 def collate_fn(batch, img_size, text_transform):
-    images_batch, sequences_batch, padded_columns = [], [], []
+    sequences_batch = []
     images_shapes = torch.tensor([image_sample.shape for image_sample, seq_sample in batch]) # Get shapes of images in batch [B, C, H, W]
     all_height_ratios = (images_shapes[:, 1] / img_size[0]) # Get height ratios for all images in batch
     all_width_reescaled = images_shapes[:, 2] / all_height_ratios # Get width reescaled for all images in batch
     assert all_height_ratios.shape[0] == all_width_reescaled.shape[0], 'All height ratios and all width reescaled must have the same length'
     max_width = img_size[1] # Get max width ratio
+    
+    images_batch = torch.ones(len(batch), 3, img_size[0], max_width) # Reescaled height and width and white background
+    padded_columns = torch.zeros(len(batch)) # Padded columns for each image
+  
 
     for i, (image_sample, seq_sample) in enumerate(batch):
-      if i == 0:
-        images_batch = torch.ones(len(batch), 3, img_size[0], max_width) # Reescaled height and width and white background
-      
       # Resize image to fixed height
       height, width = img_size[0], all_width_reescaled[i].int()
 
@@ -48,14 +49,13 @@ def collate_fn(batch, img_size, text_transform):
 
       # Calculate padding
       padding_added = max_width - image_resized_height.shape[2]
-      padded_columns.append(padding_added)
+      # padded_columns.append(padding_added)
+      padded_columns[i] = padding_added
 
       # print(f'Seq sample: {seq_sample}')
       sequences_batch.append(text_transform(seq_sample))
 
     sequences_batch = pad_sequence(sequences_batch, padding_value=PAD_IDX)
-    padded_columns = torch.tensor(padded_columns)
-
     assert images_batch.shape[0] == sequences_batch.shape[1] == padded_columns.shape[0], "Batch size of images and sequences should be equal"
     
     return images_batch, sequences_batch, padded_columns
