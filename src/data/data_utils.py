@@ -13,6 +13,9 @@ from typing import Iterable, List
 from fontTools.ttLib import TTFont
 import cv2
 import re
+import random as rnd
+from typing import Tuple
+
 
 from unidecode import unidecode
 
@@ -59,6 +62,164 @@ def collate_fn(batch, img_size, text_transform):
     assert images_batch.shape[0] == sequences_batch.shape[1] == padded_columns.shape[0], "Batch size of images and sequences should be equal"
     
     return images_batch, sequences_batch, padded_columns
+  
+  
+
+def get_text_width(image_font: ImageFont, text: str) -> int:
+    """
+    Get the width of a string when rendered with a given font
+    """
+    return round(image_font.getlength(text) + 2)
+
+def get_text_height(image_font: ImageFont, text: str) -> int:
+    """
+    Get the height of a string when rendered with a given font
+    """
+    left, top, right, bottom = image_font.getbbox(text)
+    # print(f'Top: {top}, Bottom: {bottom}')
+    return bottom
+  
+def get_max_height(image_font: ImageFont, text: str) -> int:
+    """
+    Get the height of a string when rendered with a given font
+    """
+    left, top, right, bottom = image_font.getbbox(text)
+    # print(f'Top: {top}, Bottom: {bottom}')
+    return round(int(bottom) - int(top))
+  
+def get_bboxes(image: Image) -> Tuple:
+    """
+    Get the bounding boxes for the image at a pixel level
+    """
+    image = image.convert('L')
+    image = np.array(image)
+    # print(f'Image shape: {image.shape}')
+    # Get the bounding box for the image
+    bbox = np.where(image < 255)
+    
+    x_min, x_max = np.min(bbox[1]), np.max(bbox[1])
+    y_min, y_max = np.min(bbox[0]), np.max(bbox[0])
+    
+    bbox = (x_min, y_min, x_max, y_max) # (left, top, right, bottom)
+    
+    return bbox
+
+
+
+def generate_line(font, text, font_size, stroke_width=0, stroke_fill="#000000"):
+    # font = ImageFont.FreeTypeFont(font, font_size)
+    font = ImageFont.truetype(font, font_size)
+    bbox = font.getbbox(text)
+    
+    img_size = (int((bbox[2] - bbox[0]) * 2.7), int((bbox[3] - bbox[1]) * 2.7))
+    
+    img = Image.new('RGB', img_size, color = (255,255,255))
+    draw = ImageDraw.Draw(img)
+
+    draw.text((img_size[0]//10, img_size[1]//10), text, font=font, fill=(0, 0, 0), stroke_width=stroke_width, stroke_fill=stroke_fill)
+    
+    # print(f'Bbox with numpy: {get_bboxes(img)}')
+    
+    bbox = get_bboxes(img)
+    image = img.crop(bbox).convert('L')
+    
+    # Generate white image    
+    bboxes_chars, generated_chars = [], []
+    max_width, max_height, min_width, min_height = 0, 0, 10000, 10000
+    
+    for char in text:
+      img = Image.new("RGB", (img_size[0], img_size[1]), color=(255,255,255))
+      draw = ImageDraw.Draw(img)
+      draw.text((img_size[0]//10, img_size[1]//10), char, font=font, fill=(0,0,0), stroke_width=stroke_width, stroke_fill=stroke_fill)
+      
+      if char != ' ':
+        bbox = get_bboxes(img)
+        
+        # print(f'Bbox: {bbox} for char: {char}')
+        bboxes_chars.append(bbox)
+
+        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        max_width = max(max_width, w)
+        max_height = max(max_height, bbox[3])
+        min_width = min(min_width, w)
+        min_height = min(min_height, bbox[1])
+        data = np.array(img)
+        generated_chars.append(data)
+      else:
+        bbox = (0, 0, 0, 0)
+        bboxes_chars.append(bbox)
+        data = np.array(img)
+        generated_chars.append(data)
+      
+    # Iterate and reescale each character according to the max height and max width
+    reescaled_chars = []
+    
+    for gen_char, bbox in zip(generated_chars, bboxes_chars):
+      if bbox == (0, 0, 0, 0):
+        gen_char = Image.fromarray(gen_char)
+        gen_char = gen_char.resize((64, 64))
+        reescaled_chars.append(gen_char)
+        continue
+        
+        
+      char = Image.fromarray(gen_char)
+      bbox_x = (bbox[0] + (bbox[2] - bbox[0]) / 2) - max_width / 2, (bbox[0] + (bbox[2] - bbox[0]) / 2) + max_width / 2
+      bbox_y = (bbox[3] - max_height, bbox[3])
+      bbox_y = (min_height, max_height)
+
+      bbox = (bbox_x[0], bbox_y[0], bbox_x[1], bbox_y[1])
+      
+      # Bbox is left, top, right, bottom
+      char = char.crop(bbox)
+      char = char.resize((64, 64)) # WARNING, CHECK OTHER RESIZE SIZE
+      char = char.convert('L')
+      assert char.size == (64, 64), f'Char size: {char.size}'
+      
+      # Check number of dims == 2
+      assert len(np.array(char).shape) == 2, f'Char shape: {np.array(char).shape}'
+      reescaled_chars.append(char)
+      
+    
+    # print(f'Max width, max height: {max_width},{max_height}')
+      
+    return image, reescaled_chars
+
+  
+def collate_fn_synth(batch, img_size):
+    # Batch contains img, word, chars
+    # Resize images to the same size with padding and pad the segmented characters
+    # up to the maximum number of characters
+    images, words, chars = zip(*batch)
+    assert len(images) == len(words) == len(chars)
+    max_chars = max([len(char) for char in chars])
+    char_lengths = [len(char) for char in chars]
+    images_shapes = torch.tensor([img.shape for img in images])
+    height_ratios = (images_shapes[:, 1] / img_size[0])
+    width_ratios_reescaled = images_shapes[:, 2] / height_ratios
+    max_width = img_size[1]
+    
+    images_batch = torch.ones(len(images), 1, img_size[0], img_size[1])
+    segmented_batch = torch.ones(len(chars), max_chars+1, 1, 64, 64) # +1 for blank token
+    
+    for i, (img, word, segmented_chars) in enumerate(zip(images, words, chars)):
+      height, width = img_size[0], width_ratios_reescaled[i].int().item()
+      
+      if width > max_width:
+        width = max_width
+        
+      image_resized = torchvision.transforms.Resize((height, width), antialias=True)(img)
+      images_batch[i, :, :, :image_resized.shape[2]] = image_resized
+      # segmented_batch[i, :len(word), :, :, :] = torch.stack(segmented_chars)
+      for j, char in enumerate(segmented_chars):
+        # check that n_dims == 2 and get the first channel if it has more than 1
+        if len(char.shape) == 3:
+          char = char[0, :, :]
+        segmented_batch[i, j+1, :, :, :] = char
+      
+    return images_batch, segmented_batch, char_lengths
+
+
+
 
 def has_glyph(font, glyph):
     # print(font['cmap'])
@@ -461,7 +622,6 @@ class Dilation(object):
     image =  cv2.bitwise_not(image)
     image = Image.fromarray(image)
     return image
-    # return cv2.dilate(np.array(image), self.kernel, iterations=self.iterations)
 
 # Erosion class for transform using opencv
 class Erosion(object):
@@ -474,7 +634,6 @@ class Erosion(object):
     image = cv2.bitwise_not(np.array(image))
     image = cv2.erode(image, self.kernel, iterations=self.iterations)
     image = cv2.bitwise_not(image)
-    # Convert image to PIL image
     image = Image.fromarray(image)
     return image
     
