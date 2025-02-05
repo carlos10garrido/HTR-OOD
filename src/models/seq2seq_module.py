@@ -326,7 +326,6 @@ class Seq2SeqModule(LightningModule):
 
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
-          # images_ = self.metric_logger.log_images(images[i], f'test/test_images_{dataset}') if batch_idx == 0 else None
           _label = labels[i].detach().cpu().numpy().tolist()
           # _pred = preds.sequences[i].tolist()
           _pred = preds[i].tolist()

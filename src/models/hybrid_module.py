@@ -17,6 +17,8 @@ import numpy as np
 from PIL import Image
 import wandb
 
+import gc
+
 
 class HybridModule(LightningModule):
     def __init__(
@@ -146,9 +148,9 @@ class HybridModule(LightningModule):
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != self.tokenizer.pad_id).sum()
         self.metric_logger.log_train_step(loss, acc)
 
-        if batch_idx < 2:
+        if batch_idx < 1:
           for i in range(images.shape[0]):
-            images_ = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
+            # images_ = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
             _label = labels[i].detach().cpu().numpy().tolist()
             _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
             _pred = logits[i].argmax(-1).detach().cpu().numpy().tolist()
@@ -159,14 +161,16 @@ class HybridModule(LightningModule):
             # self._logger.experiment.log({f'train/preds_{self.train_datasets[0]}': wandb.Image(images_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n epoch: {self.current_epoch}')})
 
         # update and log metrics
-        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/loss_ce", loss_ce, on_step=True, on_epoch=True, prog_bar=False)
-        self.log("train/loss_ctc", loss_enc, on_step=True, on_epoch=True, prog_bar=False)
+        self.log("train/loss", loss.detach().item(), on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/loss_ce", loss_ce.detach().item(), on_step=True, on_epoch=True, prog_bar=False)
+        self.log("train/loss_ctc", loss_enc.detach().item(), on_step=True, on_epoch=True, prog_bar=False)
         
         # Log learning rate
         lr = self.trainer.optimizers[0].param_groups[0]['lr']
         step = self.global_step
         self.log(f'training/lr_step', lr, sync_dist=True, on_step=True, on_epoch=False, prog_bar=True)
+        
+        # gc.collect()
 
         return loss 
 
@@ -179,6 +183,10 @@ class HybridModule(LightningModule):
         epoch = self.current_epoch
         print(f'Learning rate: {lr} for epoch: {epoch}')
         self.metric_logger.log_learning_rate(lr, epoch)
+        
+        # Free memory
+        gc.collect()
+        torch.cuda.empty_cache()
 
         pass
 
@@ -217,7 +225,6 @@ class HybridModule(LightningModule):
         
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
-          # images_ = self.metric_logger.log_images(images[i], f'val/validation_images_{dataset}') if self.current_epoch == 0 and batch_idx == 0 else None
           _label = labels[i].detach().cpu().numpy().tolist()
           _pred = preds[i].tolist()
 
@@ -281,6 +288,10 @@ class HybridModule(LightningModule):
 
         self.metric_logger.update_epoch(self.current_epoch)
         self.metric_logger_minusc.update_epoch(self.current_epoch)
+        
+        # Free memory
+        gc.collect()
+        torch.cuda.empty_cache()
 
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
@@ -300,7 +311,7 @@ class HybridModule(LightningModule):
         images, labels = batch[0], batch[1]
         # print(f'images.shape: {images.shape}')
         labels = labels.permute(1, 0).type(torch.LongTensor)
-        labels = labels[:, 1:].clone().contiguous() # Shift all labels to the right
+        labels = labels[:, 1:].contiguous() # Shift all labels to the right
 
         total_cer_per_batch = 0.0
 

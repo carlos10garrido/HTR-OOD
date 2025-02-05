@@ -186,6 +186,11 @@ class CRNN_CTC_Module(LightningModule):
         dataset = self.val_datasets[dataloader_idx]
         raw_preds = self.net(images).squeeze(-1).clone()
         
+        if self.current_epoch == 0:
+          str_val_dataset = f'val_' + dataset
+          self.metric_logger.log_images(images, str_val_dataset)
+          
+        
         # Calculate confidence and perplexity
         if self.log_val_metrics:
           self.metric_logger.log_val_step_confidence(raw_preds, dataset)
