@@ -69,7 +69,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     tokenizer = instantiate_tokenizers(cfg.get("tokenizer"))
 
     print(f'TOKENIZER: {tokenizer}')
-    
 
     # Init data module
     log.info("Instantiating DataModule...")
@@ -98,17 +97,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         OmegaConf.to_object(cfg.model)
     )
 
-    # logger[0].experiment.config.update(cfg.model)
-
     # Predict on test set
     log.info("Predicting on test set...")
     trainer: Trainer = hydra.utils.instantiate(
         cfg.trainer, logger=logger, callbacks=instantiate_callbacks(cfg.get("callbacks"))
     )
 
-    # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
-    
     # Load from a pretrained_checkpoint
     ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
     
@@ -133,16 +127,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         model.eval()
         # trainer.validate(model, datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
-    
-    # # Train the model
-    # trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
-    
-
-    # Test the model
-    # results = trainer.test(model, datamodule.test_dataloader())
-    # print(f'PREDICTIONS: {results}')
-
-
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train_htr.yaml")
 def main(cfg: DictConfig) -> Optional[float]:

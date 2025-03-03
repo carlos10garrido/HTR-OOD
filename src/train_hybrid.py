@@ -15,6 +15,8 @@ import torch
 
 from omegaconf import OmegaConf
 
+from torch.profiler import profile, record_function, ProfilerActivity
+import torch.autograd.profiler as profiler
 
 # import data_config as data_config
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -22,6 +24,8 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 from src.data.data_config import DatasetConfig, DataConfig
 from src.data.htr_datamodule import HTRDataModule
 from src.models.hybrid_module import HybridModule
+
+torch.autograd.set_detect_anomaly(True) 
 
 print(f'Importing modules...')
 
@@ -129,18 +133,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         trainer.test(model, datamodule.test_dataloader())
     else:
         print(f'MODEL WILL NOT BE TRAINED: {model}. Only testing will be performed.')
-        # trainer.validate(model, datamodule.val_dataloader())
+        trainer.validate(model, datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
-    
-    # # Train the model
-    # trainer.fit(model, datamodule.train_dataloader(), datamodule.val_dataloader())
-    
-
-    # Test the model
-    # results = trainer.test(model, datamodule.test_dataloader())
-    # print(f'PREDICTIONS: {results}')
-
-
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="train_htr.yaml")
 def main(cfg: DictConfig) -> Optional[float]:

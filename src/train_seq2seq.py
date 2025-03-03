@@ -61,7 +61,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
     logger[0].experiment.config.update(
         OmegaConf.to_object(cfg.get("data").get("train"))
     )
-        # cfg.get("data").get("train"))
 
     # Instantiating tokenizer
     tokenizer = instantiate_tokenizers(cfg.get("tokenizer"))
@@ -95,19 +94,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         OmegaConf.to_object(cfg.model)
     )
 
-    # logger[0].experiment.config.update(cfg.model)
-
     # Predict on test set
     log.info("Predicting on test set...")
     trainer: Trainer = hydra.utils.instantiate(
         cfg.trainer, logger=logger, callbacks=instantiate_callbacks(cfg.get("callbacks"))
     )
-
-    # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    # ckpt_path = cfg.callbacks.model_checkpoint.filename if cfg.callbacks.model_checkpoint.filename else None
-
-    # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
+    
     # Load from a pretrained_checkpoint
     ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
     
@@ -133,7 +125,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         trainer.test(model, datamodule.test_dataloader())
     else:
         print(f'MODEL WILL NOT BE TRAINED: {model}. Only testing will be performed.')
-        # trainer.validate(model, datamodule.val_dataloader())
+        trainer.validate(model, datamodule.val_dataloader())
         trainer.test(model, datamodule.test_dataloader())
 
     
