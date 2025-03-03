@@ -159,3 +159,6 @@ configs/local/default.yaml
 # Assets/outputs
 /outputs/
 /notebooks/output*
+
+# Model checkpoints
+*.ckpt
