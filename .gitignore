@@ -155,3 +155,6 @@ configs/local/default.yaml
 
 # Python Cache
 *.pyc
+
+# Assets/outputs
+/outputs/
