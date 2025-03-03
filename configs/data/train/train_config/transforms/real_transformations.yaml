@@ -18,7 +18,7 @@
 
     - _target_: torchvision.transforms.v2.RandomApply
       p: 0.5
-      transforms: # (σ = 8 and α = 64 intially, was too much)
+      transforms:
         - _target_: torchvision.transforms.v2.ElasticTransform
           sigma: 5.0
           alpha: 5.0
@@ -30,7 +30,6 @@
         - _target_: torchvision.transforms.v2.RandomAffine
           degrees: 1
           translate: [0.01, 0.05]
-          # scale: [0.7, 1.0]
           shear: [-1, 1, -1, 1] # Pixels are sheared by a factor of 5
           fill: 255 # Fill with white
 
