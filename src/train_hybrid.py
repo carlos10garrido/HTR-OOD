@@ -108,9 +108,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         cfg.trainer, logger=logger, callbacks=instantiate_callbacks(cfg.get("callbacks"))
     )
 
-    # Load a checkpoint if provided from callbacks.model_checkpoint filename
-    # ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.callbacks.model_checkpoint_base.filename + '.ckpt' if cfg.callbacks.model_checkpoint.filename else None
-    
     # Load from a pretrained_checkpoint
     ckpt_path = cfg.callbacks.model_checkpoint_base.dirpath + cfg.get("pretrained_checkpoint") + '.ckpt' if cfg.get("pretrained_checkpoint") else None
     
