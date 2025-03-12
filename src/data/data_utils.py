@@ -63,30 +63,6 @@ def collate_fn(batch, img_size, text_transform):
     
     return images_batch, sequences_batch, padded_columns
   
-  
-
-def get_text_width(image_font: ImageFont, text: str) -> int:
-    """
-    Get the width of a string when rendered with a given font
-    """
-    return round(image_font.getlength(text) + 2)
-
-def get_text_height(image_font: ImageFont, text: str) -> int:
-    """
-    Get the height of a string when rendered with a given font
-    """
-    left, top, right, bottom = image_font.getbbox(text)
-    # print(f'Top: {top}, Bottom: {bottom}')
-    return bottom
-  
-def get_max_height(image_font: ImageFont, text: str) -> int:
-    """
-    Get the height of a string when rendered with a given font
-    """
-    left, top, right, bottom = image_font.getbbox(text)
-    # print(f'Top: {top}, Bottom: {bottom}')
-    return round(int(bottom) - int(top))
-  
 def get_bboxes(image: Image) -> Tuple:
     """
     Get the bounding boxes for the image at a pixel level
@@ -179,46 +155,7 @@ def generate_line(font, text, font_size, stroke_width=0, stroke_fill="#000000"):
       assert len(np.array(char).shape) == 2, f'Char shape: {np.array(char).shape}'
       reescaled_chars.append(char)
       
-    
-    # print(f'Max width, max height: {max_width},{max_height}')
-      
     return image, reescaled_chars
-
-  
-def collate_fn_synth(batch, img_size):
-    # Batch contains img, word, chars
-    # Resize images to the same size with padding and pad the segmented characters
-    # up to the maximum number of characters
-    images, words, chars = zip(*batch)
-    assert len(images) == len(words) == len(chars)
-    max_chars = max([len(char) for char in chars])
-    char_lengths = [len(char) for char in chars]
-    images_shapes = torch.tensor([img.shape for img in images])
-    height_ratios = (images_shapes[:, 1] / img_size[0])
-    width_ratios_reescaled = images_shapes[:, 2] / height_ratios
-    max_width = img_size[1]
-    
-    images_batch = torch.ones(len(images), 1, img_size[0], img_size[1])
-    segmented_batch = torch.ones(len(chars), max_chars+1, 1, 64, 64) # +1 for blank token
-    
-    for i, (img, word, segmented_chars) in enumerate(zip(images, words, chars)):
-      height, width = img_size[0], width_ratios_reescaled[i].int().item()
-      
-      if width > max_width:
-        width = max_width
-        
-      image_resized = torchvision.transforms.Resize((height, width), antialias=True)(img)
-      images_batch[i, :, :, :image_resized.shape[2]] = image_resized
-      # segmented_batch[i, :len(word), :, :, :] = torch.stack(segmented_chars)
-      for j, char in enumerate(segmented_chars):
-        # check that n_dims == 2 and get the first channel if it has more than 1
-        if len(char.shape) == 3:
-          char = char[0, :, :]
-        segmented_batch[i, j+1, :, :, :] = char
-      
-    return images_batch, segmented_batch, char_lengths
-
-
 
 
 def has_glyph(font, glyph):
@@ -685,29 +622,6 @@ class Degradations(object):
     # invert mask to composite the image with the background
     image = Image.composite(img_pil_background_resized, image, Image.fromarray(mask))
     
-    # print(f'Returning image with degradation')
     return image
-    
-# class Background(object):
-#   def __init__(self, paths):
-#     self.paths = paths
-#     self.files = !find $paths -type f -name "*.png"
-#     # Same function but in python with os without using bash
-#     self.files = [os.path.join(dp, f) for dp, dn, filenames in os.walk(paths) for f in filenames if os.path.splitext(f)[1] == '.png']
-#     print(f'Files {self.files}')
-
-#   def __call__(self, image):
-#     # Read image
-    
-    
-#     # Add text to image
-#     paths_fonts = !find ../data/synth/final_fonts_rendered -type f -name '*.ttf'
-#     font = np.random.choice(paths_fonts)
-#     print(f'Font: {font}')
-#     font = ImageFont.truetype(font, 50)
-#     txt = 'As he pointed out, "the world is round".'
-    
-#     text_color = (0, 0, 0)
-    
     
     
