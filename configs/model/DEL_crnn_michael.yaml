@@ -1,7 +1,4 @@
 _target_: src.models.hybrid_module.HybridModule
-
-# TODO: CHANGE TO HYBRID MODULE
-# _target_: src.models.crnn_ctc_module.CRNN_CTC_Module
 # Accessing to data in configs/train_htr.yaml
 datasets: ${data}
 _logger: ${logger}

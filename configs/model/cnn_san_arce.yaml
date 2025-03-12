@@ -4,7 +4,6 @@ datasets: ${data}
 _logger: ${logger}
 tokenizer: ${tokenizer}
 
-
 optimizer:
   _target_: torch.optim.RMSprop
   _partial_: true

@@ -6,7 +6,6 @@ tokenizer: ${tokenizer}
 
 log_val_metrics: false
 
-
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
@@ -14,13 +13,6 @@ optimizer:
   # weight_decay: 0.001
 
 scheduler: null 
-  #  We use an initial learning rate of 0.001 and apply a cosine-like decay 
-  # in the final 50 epochs to finetune the parameters of the network.
-  # _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  # _partial_: true
-  # mode: min
-  # factor: 0.1
-  # patience: 10
 
 net: 
   _target_: src.models.components.van_coquenet.VAN_Coquenet

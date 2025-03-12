@@ -1,14 +1,10 @@
 _target_: src.models.hybrid_module.HybridModule
-# _target_: src.models.seq2seq_module.Seq2SeqModule
-# _target_: src.models.crnn_ctc_module.CRNN_CTC_Module
-
 # Accessing to data in configs/train_htr.yaml
 datasets: ${data}
 _logger: ${logger}
 tokenizer: ${tokenizer}
 
 log_val_metrics: false
-
 
 optimizer:
   _target_: torch.optim.Adam
@@ -17,28 +13,12 @@ optimizer:
   # weight_decay: 0.001
 
 scheduler: null 
-  #  We use an initial learning rate of 0.001 and apply a cosine-like decay 
-  # in the final 50 epochs to finetune the parameters of the network.
-  # _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  # _partial_: true
-  # mode: min
-  # factor: 0.1
-  # patience: 10
-
-# scheduler:
-#   - _target_: torch.optim.lr_scheduler.ExponentialLR
-#     _partial_: true
-#     gamma: 0.9999
-    # optimizer: scheduler.optimizer
-    # verbose: true
-
 
 net: 
   _target_: src.models.components.crnn_michael_att.CRNN_Michael
   input_size: 128 
-  hidden_size: 256 # Original is the half
-  att_dim:  128 # Original is the half
-  # num_layers: 5
+  hidden_size: 256
+  att_dim:  128
   tokenizer: ${tokenizer}
   char_embedding_size: 64
   dropout_encoder: 0.5

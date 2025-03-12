@@ -7,7 +7,6 @@ tokenizer: ${tokenizer}
 
 log_val_metrics: False
 
-
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
@@ -17,23 +16,6 @@ optimizer:
 
 scheduler: null
 
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.SequentialLR
-#   _partial_: true
-#   milestones: [4000]
-#   schedulers: 
-#     - _target_: torch.optim.lr_scheduler.LinearLR
-#       _partial_: true
-#       start_factor: 0.001
-#       total_iters: 4000
-#       # optimizer: scheduler.optimizer
-
-#     - _target_: torch.optim.lr_scheduler.ExponentialLR
-#       _partial_: true
-#       gamma: 0.999999
-#       # optimizer: scheduler.optimizer
-#   verbose: true
-      
 net: 
   _target_: src.models.components.transformer_kang_torch.TransformerKangTorch
   use_backbone: True
@@ -43,7 +25,6 @@ net:
   encoder_attention_heads: 8
   encoder_ffn_dim: 1024
   patch_size: 1
-  # vocab_size: 101
   d_model: 1024
   dropout: 0.1
   decoder_layers: 4

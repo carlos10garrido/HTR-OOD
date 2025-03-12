@@ -14,34 +14,6 @@ optimizer:
 
 scheduler: null
 
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.SequentialLR
-#   _partial_: true
-#   milestones: [4000]
-#   schedulers: 
-#     - _target_: torch.optim.lr_scheduler.LinearLR
-#       _partial_: true
-#       start_factor: 0.0001
-#       total_iters: 4000
-#       # optimizer: scheduler.optimizer
-
-#     - _target_: torch.optim.lr_scheduler.ExponentialLR
-#       _partial_: true
-#       gamma: 0.9999
-#       # optimizer: scheduler.optimizer
-#   verbose: true
-
-      
-
-# Scheduler is a labmda funct for a linear ramp warmup of 4000 steps and a decay of 0.9999
-# scheduler:
-#   _target_: torch.optim.lr_scheduler.LambdaLR
-#   _partial_: true
-#   lr_lambda: |
-#     lambda epoch: 0.9999 ** epoch if epoch < 4000 else 
-#   last_epoch: -1
-
-
 net: 
   _target_: src.models.components.light_barrere.Light_Barrere
   image_size: ${data.train.train_config.img_size}
