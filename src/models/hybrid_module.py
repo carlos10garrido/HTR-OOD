@@ -1,23 +1,13 @@
 from typing import Any, Dict, Tuple
-
 import torch
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric, MinMetric
-from torchmetrics.classification.accuracy import Accuracy
 from torchmetrics.text import CharErrorRate as CER
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
-import torchvision
-import os
-import src
 from src.data.components.tokenizers import Tokenizer
-
-import numpy as np
 from PIL import Image
 import wandb
-
-import gc
 
 
 class HybridModule(LightningModule):
@@ -33,7 +23,6 @@ class HybridModule(LightningModule):
         log_val_metrics: bool = False,
     ) -> None:
         """Initialize a `HybridModule`.
-
         :param net: The model to train.
         :param optimizer: The optimizer to use for training.
         :param scheduler: The learning rate scheduler to use for training.
@@ -54,7 +43,6 @@ class HybridModule(LightningModule):
         print(f'self.val_datasets: {self.val_datasets}')
         print(f'self.test_datasets: {self.test_datasets}')
 
-        self.train_loss = MeanMetric()
         self.train_cer = CER()
 
         self.val_cer_minus = CER()
@@ -142,8 +130,6 @@ class HybridModule(LightningModule):
           loss_ce = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
           loss_enc = self.ctc_criterion(enc_outputs, labels, input_lengths, target_lengths)
           loss = 0.5 * loss_ce + (1 - 0.5) * loss_enc
-          # loss = loss_ce
-          # loss = loss_enc
 
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != self.tokenizer.pad_id).sum()
         self.metric_logger.log_train_step(loss, acc)
@@ -170,8 +156,6 @@ class HybridModule(LightningModule):
         step = self.global_step
         self.log(f'training/lr_step', lr, sync_dist=True, on_step=True, on_epoch=False, prog_bar=True)
         
-        # gc.collect()
-
         return loss 
 
     def on_train_epoch_end(self) -> None:
@@ -183,12 +167,6 @@ class HybridModule(LightningModule):
         epoch = self.current_epoch
         print(f'Learning rate: {lr} for epoch: {epoch}')
         self.metric_logger.log_learning_rate(lr, epoch)
-        
-        # Free memory
-        gc.collect()
-        torch.cuda.empty_cache()
-
-        pass
 
     
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
@@ -216,12 +194,6 @@ class HybridModule(LightningModule):
           self.metric_logger.log_val_step_confidence(raw_preds, dataset)
           self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
           self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
-          
-          # Predict as in training to get the perplexity. Basically exponentiate the cross-entropy loss
-          with torch.no_grad():
-            enc_outputs, dec_outputs = self.net(x=images, y=labels)
-          
-          # self.metric_logger.log_val_step_ext_perplexity(dec_outputs, labels, dataset)
         
         preds_str, labels_str = [], []
         for i in range(images.shape[0]):
@@ -288,10 +260,6 @@ class HybridModule(LightningModule):
 
         self.metric_logger.update_epoch(self.current_epoch)
         self.metric_logger_minusc.update_epoch(self.current_epoch)
-        
-        # Free memory
-        gc.collect()
-        torch.cuda.empty_cache()
 
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int, dataloader_idx: int = None) -> None:
@@ -303,7 +271,6 @@ class HybridModule(LightningModule):
         """
         dataloader_idx = 0 if len(self.test_datasets) == 1 else dataloader_idx
         dataset = self.test_datasets[dataloader_idx]
-        # print(f'Calculating test CER for each dataset for dataloader_idx: {dataloader_idx}. Dataset: {dataset}')
 
         # Get epoch
         epoch = self.current_epoch
@@ -321,30 +288,19 @@ class HybridModule(LightningModule):
         
         preds, raw_preds = self.net.predict_greedy(images)
         
-        # breakpoint()
-        
         self.metric_logger.log_test_step_confidence(raw_preds, dataset)
         self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
         self.metric_logger.log_test_step_int_perplexity(raw_preds, dataset)
         
-        # Predict as in training to get the perplexity. Basically exponentiate the cross-entropy loss
-        # with torch.no_grad():
-        #   enc_outputs, dec_outputs = self.net(x=images, y=labels)
-        
-        # self.metric_logger.log_test_step_ext_perplexity(dec_outputs[:, :-1], labels, dataset)
-        
-        preds_str, labels_str = [], []
         for i in range(images.shape[0]):
           _label = labels[i].detach().cpu().numpy().tolist()
           _pred = preds[i].tolist()
-
           _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
           _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
           
           self.metric_logger.log_test_step_cer(_pred, _label, dataset)
           self.metric_logger.log_test_step_wer(_pred, _label, dataset)
 
-          # print(f'TEST Label: {_label}. Pred: {_pred}')
           cer = CER()(_pred, _label)
           
           # if batch_idx < 1:
@@ -391,8 +347,6 @@ class HybridModule(LightningModule):
         if self.hparams.scheduler is not None:
             print(f'Using scheduler: {self.hparams.scheduler}')
 
-            # breakpoint()
-
             # If the class of the scheduler is SequentialLR, set the optimizer for the scheduler
             if "SequentialLR" in str(self.hparams.scheduler.func):
               schedulers = []
@@ -428,4 +382,4 @@ class HybridModule(LightningModule):
         return {"optimizer": optimizer}
 
 if __name__ == "__main__":
-    _ = MNISTLitModule(None, None, None, None)
+    _ = HybridModule(None, None, None, None)

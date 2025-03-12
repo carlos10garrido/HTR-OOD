@@ -2,8 +2,6 @@ from typing import Any, Dict, Tuple
 
 import torch
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric, MinMetric
-from torchmetrics.classification.accuracy import Accuracy
 from torchmetrics.text import CharErrorRate as CER
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
@@ -11,8 +9,6 @@ log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 import torchvision
 import os
 import src
-# import global variables encode and decode from htr_data_module.py
-# from src.data.htr_datamodule import encode, decode
 from src.data.components.tokenizers import Tokenizer
 
 import numpy as np
@@ -57,16 +53,13 @@ class Seq2SeqModule(LightningModule):
         print(f'self.train_datasets: {self.train_datasets}')
         print(f'self.val_datasets: {self.val_datasets}')
         print(f'self.test_datasets: {self.test_datasets}')
-
-        self.train_loss = MeanMetric()
+        
         self.train_cer = CER()
-
         self.val_cer_minus = CER()
         self.test_cer_minus = CER()
         self.net = net
         self.tokenizer = tokenizer
 
-        # loss function
         # add label smoothing of 0.4 for transformers
         self.criterion = torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id, label_smoothing=0.4) if self.net.__class__.__name__ == 'TransformerKangTorch' else torch.nn.CrossEntropyLoss(ignore_index=self.tokenizer.pad_id)
 
@@ -141,8 +134,6 @@ class Seq2SeqModule(LightningModule):
           logits = outputs
           
         loss = self.criterion(logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
-        
-        # print(f'loss: {loss}')
         acc = (logits.argmax(dim=-1) == labels).sum() / (labels != 1).sum() # 1 is the padding token
         self.metric_logger.log_train_step(loss, acc)
 
@@ -175,63 +166,53 @@ class Seq2SeqModule(LightningModule):
         """
         dataloader_idx = 0 if len(self.val_datasets) == 1 else dataloader_idx
         dataset = self.val_datasets[dataloader_idx]
-        # print(f'Calculating validation CER for each dataset for dataloader_idx: {dataloader_idx}. Dataset: {dataset}')
-
-        # Get epoch
-        epoch = self.current_epoch
         
-        # if epoch >= 300:
-        if epoch >= -1:
-          images, labels = batch[0], batch[1]
-          labels = labels.permute(1, 0)
-          labels = labels[:, 1:].contiguous() # Shift all labels to the right
+        images, labels = batch[0], batch[1]
+        labels = labels.permute(1, 0)
+        labels = labels[:, 1:].contiguous() # Shift all labels to the right
 
-          total_cer_per_batch = 0.0
+        total_cer_per_batch = 0.0
 
-          if self.current_epoch == 0 and self.global_step <= 1:
-            str_train_datasets = f'val_' + ', '.join(self.train_datasets)
-            # self.metric_logger.log_images(images, str_train_datasets)
+        if self.current_epoch == 0 and self.global_step <= 1:
+          str_train_datasets = f'val_' + ', '.join(self.train_datasets)
+          # self.metric_logger.log_images(images, str_train_datasets)
 
-          preds, raw_preds = self.net.predict_greedy(images)
-          preds = preds.sequences if hasattr(preds, 'sequences') else preds
-          raw_preds = raw_preds.squeeze(-1)
+        preds, raw_preds = self.net.predict_greedy(images)
+        preds = preds.sequences if hasattr(preds, 'sequences') else preds
+        raw_preds = raw_preds.squeeze(-1)
+        
+        if self.log_val_metrics:
+          self.metric_logger.log_val_step_confidence(raw_preds, dataset)
+          self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
+          self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
+
+        for i in range(images.shape[0]):
+          _label = labels[i].detach().cpu().numpy().tolist()
+          _pred = preds[i].tolist()
+
+          _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
+          _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
           
-          if self.log_val_metrics:
-            self.metric_logger.log_val_step_confidence(raw_preds, dataset)
-            self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
-            self.metric_logger.log_val_step_int_perplexity(raw_preds, dataset)
+          # if batch_idx < 1:
+          #   print(f'VAL Label: {_label}. Pred: {_pred}')
+          
+          self.metric_logger.log_val_step_cer(_pred, _label, dataset)
+          self.metric_logger.log_val_step_wer(_pred, _label, dataset)
+          _pred_minus, _label_minus = _pred.lower(), _label.lower()
 
-          for i in range(images.shape[0]):
-            _label = labels[i].detach().cpu().numpy().tolist()
-            _pred = preds[i].tolist()
+          self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
+          self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
 
-            _label = [label if label != -100 else self.tokenizer.pad_id for label in _label]
-            _label, _pred = self.tokenizer.detokenize(_label), self.tokenizer.detokenize(_pred)
-            
-            # if batch_idx < 1:
-            #   print(f'VAL Label: {_label}. Pred: {_pred}')
-            
-            self.metric_logger.log_val_step_cer(_pred, _label, dataset)
-            self.metric_logger.log_val_step_wer(_pred, _label, dataset)
-            _pred_minus, _label_minus = _pred.lower(), _label.lower()
-
-            self.metric_logger_minusc.log_val_step_cer(_pred_minus, _label_minus, f'{dataset}_minusc')
-            self.metric_logger_minusc.log_val_step_wer(_pred_minus, _label_minus, f'{dataset}_minusc')
-
-            cer = CER()(_pred, _label)
-            total_cer_per_batch += cer
-        else:
-          # print(f'Epoch: {epoch}. Skipping validation step for epoch < 100')
-          pass
+          cer = CER()(_pred, _label)
+          total_cer_per_batch += cer
 
     def on_validation_epoch_end(self) -> None:
         "Lightning hook that is called when a validation epoch ends."
         
         epoch = self.current_epoch
         
-        # if epoch >= 300:
-        if epoch >= -1:
-
+        # Change this if you want to skip validation for the first N epochs
+        if epoch >= 0:
           mean_val_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cers, val_cers = self.metric_logger.log_val_metrics()
           for dataset, val_cer in val_cers.items():
               self.log(f'val/val_cer_{dataset}', val_cer, sync_dist=True, prog_bar=True)
@@ -382,8 +363,6 @@ class Seq2SeqModule(LightningModule):
         print(f'Number of parameters: {sum(p.numel() for p in self.parameters() if p.requires_grad)}')
         if self.hparams.scheduler is not None:
             print(f'Using scheduler: {self.hparams.scheduler}')
-
-            # breakpoint()
 
             # If the class of the scheduler is SequentialLR, set the optimizer for the scheduler
             if "SequentialLR" in str(self.hparams.scheduler.func):

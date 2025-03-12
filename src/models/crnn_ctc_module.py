@@ -2,16 +2,12 @@ from typing import Any, Dict, Tuple
 
 import torch
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric, MinMetric
-from torchmetrics.classification.accuracy import Accuracy
 from torchmetrics.text import CharErrorRate as CER
-from torchmetrics.regression import MeanAbsoluteError as MAE
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 # import rootutils
 # rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-
 import os 
 import src
 import wandb
@@ -57,7 +53,6 @@ class CRNN_CTC_Module(LightningModule):
         print(f'self.val_datasets: {self.val_datasets}')
         print(f'self.test_datasets: {self.test_datasets}')
 
-        self.train_loss = MeanMetric()
         self.train_cer = CER()
 
         self.val_cer_minus = CER()
@@ -201,17 +196,12 @@ class CRNN_CTC_Module(LightningModule):
         self.metric_logger.log_val_step_calibration(raw_preds, labels, dataset)
           
         total_cer_per_batch = 0.0
-        # print(f'---VALIDATION STEP----- ended')
         
         for i in range(images.shape[0]):
           _label = labels[i].detach().cpu().numpy().tolist()
           _pred = torch.unique_consecutive(preds[i].detach()).cpu().numpy().tolist()
           _pred = [idx for idx in _pred if idx != self.net.vocab_size] # Remove blank token
-          
-          # _pred, _label = self.decode_text(_pred, self.net.vocab_size), self.decode_text(_label, self.net.vocab_size)
           _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
-
-          # print(f'Label: {_label} - Pred: {_pred}')
 
           # Calculate CER converting mayus to minus
           _label_minus = _label.lower()
@@ -289,7 +279,6 @@ class CRNN_CTC_Module(LightningModule):
       self.metric_logger.log_test_step_calibration(raw_preds, labels, dataset)
 
       total_cer_per_batch = 0.0
-      # print(f'-- TEST STEP----- ended')
       
       for i in range(images.shape[0]):
         _label = labels[i].detach().cpu().numpy().tolist()
@@ -308,11 +297,6 @@ class CRNN_CTC_Module(LightningModule):
 
         # Calculate CER
         cer = CER()(_pred, _label)
-        # if batch_idx < 1:
-        #   orig_image = torchvision.transforms.ToPILImage()(images[i].detach().cpu())
-        #   # self._logger.experiment.log({f'test/preds_{dataset}': wandb.Image(image_, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
-        #   self._logger.experiment.log({f'test/original_image_{dataset}': wandb.Image(orig_image, caption=f'Label: {_label} \n Pred: {_pred} \n CER: {cer} \n CER minus: {cer_minus} \n epoch: {self.current_epoch}')})
-
         
         self.metric_logger.log_test_step_cer(_pred, _label, dataset)
         self.metric_logger.log_test_step_wer(_pred, _label, dataset)
@@ -326,30 +310,11 @@ class CRNN_CTC_Module(LightningModule):
         test_cer, test_wer = self.metric_logger.log_test_metrics()
         print(f'test_cer: {test_cer}')
         print(f'test_wer: {test_wer}')
-        # self.log(f'test/cer_epoch', test_cer, sync_dist=True, prog_bar=True)
-        # self.log(f'test/wer_epoch', test_wer, sync_dist=True, prog_bar=True)
-
+        
         test_cer_minus, test_wer_minus = self.metric_logger_minusc.log_test_metrics()
         print(f'test_cer_minus: {test_cer_minus}')
         print(f'test_wer_minus: {test_wer_minus}')
-        # self.log(f'test/cer_epoch_minusc', test_cer_minus, sync_dist=True, prog_bar=True)
-        # self.log(f'test/wer_epoch_minusc', test_wer_minus, sync_dist=True, prog_bar=True)
-
-
-        # mean_test_cer, in_domain_cer, out_of_domain_cer, heldout_domain_cer = self.metric_logger.log_test_metrics()
-        # print(f'mean_test_cer: {mean_test_cer}')
-        # self.log(f'test/mean_cer', mean_test_cer, sync_dist=True, prog_bar=True)
-        # self.log(f'test/in_domain_cer', in_domain_cer, sync_dist=True, prog_bar=True)
-        # self.log(f'test/out_of_domain_cer', out_of_domain_cer, sync_dist=True, prog_bar=True)
-        # self.log(f'test/heldout_domain_cer', heldout_domain_cer, sync_dist=True, prog_bar=True)
         
-        # Log CER minusc
-        # mean_test_cer_minus, in_domain_cer_minus, out_of_domain_cer_minus, heldout_domain_cer_minus = self.metric_logger_minusc.log_test_metrics()
-        # self.log(f'test/mean_cer_minusc', mean_test_cer_minus, sync_dist=True, prog_bar=True)
-        # self.log(f'test/in_domain_cer_minusc', in_domain_cer_minus, sync_dist=True, prog_bar=True)
-        # self.log(f'test/out_of_domain_cer_minusc', out_of_domain_cer_minus, sync_dist=True, prog_bar=True)
-        # self.log(f'test/heldout_domain_cer_minusc', heldout_domain_cer_minus, sync_dist=True, prog_bar=True)
-
         self.metric_logger.update_epoch(self.current_epoch)
         self.metric_logger_minusc.update_epoch(self.current_epoch)
 
@@ -394,4 +359,4 @@ class CRNN_CTC_Module(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = HTRCharClassifier(None, None, None, None)
+    _ = CRNN_CTC_Module(None, None, None, None)
