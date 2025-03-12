@@ -95,11 +95,6 @@ class CharTokenizer(Tokenizer):
       for i, char in enumerate(vocab):
         self.vocab[char] = i + 4
 
-      # ADD ['et'] + ['ç'] TO VOCAB (not used since we use unidecode)
-      # self.vocab['et'] = len(self.vocab)
-      # self.vocab['ç'] = len(self.vocab)
-
-
       self.ids_to_tokens = {v: k for k, v in self.vocab.items()}
       self._vocab_size = len(self.vocab)
       print(f'VOCAB SIZE TOKENIZER: {self.vocab_size}')
