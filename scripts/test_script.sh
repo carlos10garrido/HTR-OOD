@@ -19,7 +19,6 @@ checkpoints=$(ls checkpoints/ | grep "\b$model_name" | grep src_$dataset_src)
 echo "Number of checkpoints found: $(echo $checkpoints | wc -w)"
 echo "Checkpoints found: $checkpoints"
 
-
 for checkpoint in $checkpoints
 do
   # Remove .ckpt extension
@@ -41,7 +40,6 @@ do
       logger.wandb.name=${model_name_without_ckpt}_test \
       data.train.train_config.binarize=True \
       data.train.train_config.num_workers=16 \
-      +trainer.precision="bf16-mixed" \
       train=False"
   echo $eval
   eval $eval
