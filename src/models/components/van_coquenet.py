@@ -173,11 +173,3 @@ class VAN_Coquenet(Module):
     
 if __name__ == "__main__":
     _ = VAN_Coquenet()
-
-
-
-    
-
-
-      
-
