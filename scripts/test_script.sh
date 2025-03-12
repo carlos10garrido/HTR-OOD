@@ -1,12 +1,11 @@
 # #!/bin/bash
 
 # Schedule execution of many runs
-python_module=$1
+python_module=$1 # e.g. src/train_seq2seq.py
 model_name=$2
 dataset_src=$3
 img_size=$4
 batch_size=$5
-
 
 # Get all the checkpoints containing that model inside checkpoints folder
 echo "Inside folder $(pwd)"

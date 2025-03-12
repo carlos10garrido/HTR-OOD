@@ -3,7 +3,7 @@
 # Schedule execution of many runs
 model_name=$1
 img_size=$2
-script_name=$3
+script_name=$3 e.g. src/train_seq2seq.py
 
 # Get all the checkpoints containing that model inside checkpoints folder
 echo "Inside folder $(pwd)"
@@ -14,9 +14,6 @@ echo "image size: $img_size"
 checkpoints=$(ls checkpoints/ | grep $model_name)
 
 echo "Number of checkpoints found: $(echo $checkpoints | wc -w)"
-
-# echo "Checkpoints found: $checkpoints"
-
 
 for checkpoint in $checkpoints
 do

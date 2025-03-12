@@ -1,10 +1,8 @@
 # #!/bin/bash
 
 # Schedule execution of many runs
-
 dataset_list="iam rimes washington saint_gall bentham rodrigo icfhr_2016"
 model_pretrained=$1
-# Train CRNN with real data
 
 optim_targets=$(echo $dataset_list | sed "s/ /,/g")
 
