@@ -304,7 +304,6 @@ class MaskedAutoencoderViT(nn.Module):
 
     def forward(self, x, mask_ratio=0.4, max_span_length=8, use_masking=True): # Modified to include mask_ratio and max_span_length as in the original paper
         # embed patches
-        # breakpoint()
         x = self.layer_norm(x)
         x = self.patch_embed(x)
         # print(f'x shape: {x.shape} after patch embedding')
