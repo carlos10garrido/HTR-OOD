@@ -75,10 +75,7 @@ class TransformerKangTorch(nn.Module):
 
         if self.use_backbone:
           self.backbone = torch.hub.load('pytorch/vision', 'resnet34', pretrained=False)
-
-          # Unmodify 
-          # Change stride of last layer (2,2) to (1,1)
-
+          
           # Resnet 50 modification
           # self.backbone.layer4[0].downsample[0].stride = (1,1)
           # self.backbone.layer4[0].conv2.stride = (1,1)
@@ -185,7 +182,7 @@ class TransformerKangTorch(nn.Module):
         
         memory = self.transformer.encoder(src)
 
-        # Prediction
+        # Prediction (up to 130 tokens)
         for i in range(130):
             tgt = self.pos_encoding_dec(self.text_embedding(preds))
             outputs = self.transformer.decoder(tgt, memory)

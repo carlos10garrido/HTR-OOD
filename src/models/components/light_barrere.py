@@ -197,18 +197,13 @@ class Light_Barrere(nn.Module):
 
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
-
-      # breakpoint()
       # CNN encoder
-      # print(f'x.shape: {x.shape}')
       cnn_output = self.cnn_encoder(x)
-      # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
       cnn_output = self.leaky_relu(cnn_output)
       cnn_output = self.layer_norm_collapse(cnn_output)
       cnn_output = self.dense(cnn_output)
-      # print(f'cnn_output.shape: {cnn_output.shape} after collapse layer')
       
       # Transformer encoder
       pe_output = self.pe_encoder(cnn_output)
@@ -244,15 +239,12 @@ class Light_Barrere(nn.Module):
 
     # Inference forward
     def predict_greedy(self, x: torch.Tensor) -> torch.Tensor:
-      # breakpoint()
       # Create batch size of BOS tokens
       output = torch.ones((x.size(0), 1), dtype=torch.int) * self.tokenizer.bos_id
       output = output.to(x.device)
 
       # CNN encoder
-      # print(f'x.shape: {x.shape}')
       cnn_output = self.cnn_encoder(x)
-      # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
       cnn_output = self.leaky_relu(cnn_output)
@@ -264,7 +256,7 @@ class Light_Barrere(nn.Module):
       encoder_output = self.encoder(pe_output)
 
       # CTC prediction # [B,W,vocab_size+1] -> (permute) -> [W ,B,vocab_size+1]
-      pred_ctc_encoder = self.pred_ctc(encoder_output).permute(1, 0, 2) 
+      pred_ctc_encoder = self.pred_ctc(encoder_output).permute(1, 0, 2) # Not used
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)

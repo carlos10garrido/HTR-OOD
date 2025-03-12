@@ -138,7 +138,7 @@ class V_Light_Barrere(nn.Module):
       self.leaky_relu = nn.LeakyReLU()
 
 
-      # CNN encoder
+      # CNN encoder (from the paper)
       # Except the last one, each convolutional block is composed of a 2D convolutional layer with a kernel of size 3×3, a stride of 1 and no padding. 
       # The last convolutional block uses a kernel size of 4×2 to better match the shape of a character [3,13]. 
       # The number of filters in the convolutional layers are respectively equal to 8, 16, 32, 64 and 128. 
@@ -205,12 +205,8 @@ class V_Light_Barrere(nn.Module):
 
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
-
-      # breakpoint()
       # CNN encoder
-      # print(f'x.shape: {x.shape}')
       cnn_output = self.cnn_encoder(x)
-      # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
       cnn_output = self.leaky_relu(cnn_output)
@@ -226,7 +222,6 @@ class V_Light_Barrere(nn.Module):
 
       # Cross attention positional encoding
       cross_output = self.pe_cross(encoder_output)
-      
       tgt_key_padding_mask = (y == self.tokenizer.pad_id).to(x.device)
       
       # Transformer decoder
@@ -257,9 +252,7 @@ class V_Light_Barrere(nn.Module):
       output = output.to(x.device)
 
       # CNN encoder
-      # print(f'x.shape: {x.shape}')
       cnn_output = self.cnn_encoder(x)
-      # print(f'cnn_output.shape: {cnn_output.shape}')
       cnn_output = cnn_output.flatten(1,2).permute(0, 2, 1) # [B, W, C*H]
       cnn_output = self.collapse_layer(cnn_output) # [B, W, d_model]
       cnn_output = self.leaky_relu(cnn_output)

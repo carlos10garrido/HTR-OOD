@@ -42,9 +42,6 @@ class ContentBasedAttention(nn.Module):
         self.b = nn.Parameter(torch.zeros(hidden_size))
         
     def forward(self, encoder_outputs, decoder_h_t):
-        # query: decoder hidden state [B, dec_dim, 1] (1 is layer)
-        # key: encoder hidden states [B, T, enc_dim]
-        
         # Bahdanau scoring function
         batch_size, sequence_length, enc_dim = encoder_outputs.size()
         
@@ -211,10 +208,7 @@ class CRNN_Michael(nn.Module):
           # logit_list.append(logit)
           logit_list[:, i] = logit.squeeze(1)
 
-      # return cnn_output.log_softmax(-1).permute(1, 0, 2)#, torch.stack(logit_list, dim=1).squeeze(-2)
       return cnn_output.log_softmax(-1).permute(1, 0, 2), logit_list
-      # return torch.stack(logit_list, dim=1) # Only for seq2seq training
-
 
     # Inference forward
     def predict_greedy(self, x: torch.Tensor) -> torch.Tensor:
@@ -265,7 +259,6 @@ class CRNN_Michael(nn.Module):
           # output_list.append(logit)
           output_list[:, i] = logit.squeeze(1)
           
-      # return torch.stack(output_list, dim=1).squeeze(-1), torch.stack(raw_preds, dim=1).squeeze(-2)
       return output_list.detach(), raw_preds.detach()
 
 if __name__ == "__main__":
