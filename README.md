@@ -24,7 +24,7 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 - We introduce **proxy metrics** that reliably estimate generalization error in OOD scenarios.
 ---
 
-## 📂 Repository Structure
+## 📂 Repository Structure 
 
 ```plaintext
 📁 htr_ood/
@@ -46,9 +46,9 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 
 ### 🔧 Requirements
 - Python 3.8+
-- PyTorch
+- PyTorch >= 2.0
 - NumPy, OpenCV, Matplotlib, Pandas
-- Weights & Biases (optional for logging)
+- WandB (optional for logging)
 
 To install dependencies, run:
 
@@ -59,23 +59,35 @@ pip install -r requirements.txt
 ---
 
 ## ⚙️ Models
+We examined the following start-of-the-art models in the literature of HTR:
+| **Model**       | **Citation** | **Config File**  | **Architecture**                           | **Alignment** | **Parameters** | **Input Size (H × W)** |
+|----------------|------------|--------------|--------------------------------|--------------|----------------|----------------|
+| **CRNN**       | Puigcerver et al., 2017       | `configs/model/crnn_puig.yaml`  | CRNN + CTC                     | CTC          | 9.6M           | **128 × 1024** |
+| **VAN**        | Coquenet et al., 2020       | `configs/model/van_coquenet.yaml`   | Fully Convolutional Network (FCN) w. CTC | CTC       | 2.7M           | **64 × 1024**  |
+| **C-SAN**      | Arce et al., 2022       | `configs/model/cnn_san_arce.yaml`  | CNN + Self Attention + CTC     | CTC          | 1.7M           | **128 × 1024** |
+| **HTR-VIT**    | L et al., 2025       | `configs/model/htr_vit.yaml` | CNN + Vision Transformer + CTC | CTC          | 53.5M          | **64 × 512**   |
+| **Kang**       | Kang et al., 2020       | `configs/model/transformer_kang.yaml`  | ResNet + Transformer           | Seq2Seq      | 90M            | **64 × 2227**  |
+| **Michael**    | Michael et al., 2019       | `configs/model/crnn_michael.yaml` | CRNN + Attention Decoder       | Hybrid       | 5M             | **64 × 1024**  |
+| **LT**         | Barrere et al., 2022       |`configs/model/light_barrere.yaml`    | CNN + Transformer + CTC        | Hybrid       | 7.7M           | **128 × 1024** |
+| **VLT**        | Barrere et al., 2024       | `configs/model/v_light_barrere.yaml`   | CNN + Transformer + CTC        | Hybrid       | 5.6M           | **128 × 1024** |
+
 
 
 ---
 
 ## 📊 Datasets
 
-We evaluate generalization performance on the following handwritten text datasets:
+We evaluate generalization performance on the following handwritten text datasets at the line-level:
 
-| Dataset     | Language  | Period      | Writers | Samples |
-|------------|----------|-------------|---------|---------|
-| IAM        | English  | 1999         | 657     | 9,376   |
-| Rimes      | French   | 2011         | 1.3K    | 11,778  |
-| Bentham    | English  | 18-19th c.   | 1       | 10,460  |
-| St. Gall   | Latin    | 9-12th c.    | 1       | 1,642   |
-| G.Washington | English | 1755       | 1       | 493     |
-| Rodrigo    | Spanish  | 1545         | 1       | 26,000  |
-| ICFHR2016  | German   | 15-19th c.   | Unknown | 10,200  |
+| Dataset     | Language  | Period     | Writers | Configuration |
+|------------|----------|------------- |---------|---------------|
+| IAM        | English  | 1999         | 657     | iam            |
+| Rimes      | French   | 2011         | 1.3K    | rimes          |
+| Bentham    | English  | 18-19th c.   | 1       | bentham        |
+| St. Gall   | Latin    | 9-12th c.    | 1       | saint_gall     |
+| G.Washington | English | 1755        | 1       | washington     |
+| Rodrigo    | Spanish  | 1545         | 1       | rodrigo        |
+| ICFHR2016  | German   | 15-19th c.   | Unknown | icfhr_2016     |
 
 To download and preprocess datasets, use:
 
@@ -98,7 +110,7 @@ data.train.train_config.binarize=True \
 data.train.train_config.num_workers=8 \
 trainer.max_epochs=500 \
 trainer.deterministic=False \
-model=crnn_michael_att \
+model=crnn_puig \
 tokenizer=tokenizers/char_tokenizer \
 callbacks.early_stopping.patience=100 \
 callbacks.model_checkpoint_base.filename=crnn_michael_src_iam \
@@ -122,12 +134,11 @@ train=True
 | `data.train.train_config.binarize=True` | Enables binarization of images for preprocessing. By default is true! |
 | `data.train.train_config.num_workers=8` | Uses **8 worker threads** for data loading. |
 | `trainer.max_epochs=500` | Limits training to **500 epochs**. |
-| `trainer.deterministic=False` | Allows **non-deterministic** behavior for potential performance benefits. |
+| `trainer.deterministic=False` | Allows **non-deterministic** behavior. Should be turned off when training with the CTC objective!|
 | `model=crnn_puig` | Uses the **CRNN+CTC model** from Puigcerver, 2017  for training. |
 | `tokenizer=tokenizers/char_tokenizer` | Specifies the **character-level tokenizer** for text processing. |
 | `callbacks.early_stopping.patience=100` | Implements early stopping if validation does not improve for **100 epochs**. |
 | `callbacks.model_checkpoint_base.filename=crnn_puig_src_iam` | Defines the base filename for saving checkpoints. |
-| `callbacks.model_checkpoint_id.filename=\${callbacks.model_checkpoint_base.filename}_ID` | Appends `_ID` to the checkpoint filename for ID-based evaluation. |
 | `callbacks/heldout_targets=[rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016]` | Specifies datasets **not seen during training** for out-of-distribution (OOD) evaluation. This will create the N checkpoints optimized using a leave-one-out for later testing on the excluded. |
 | `callbacks/optim_targets=[iam,rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016]` | Lists datasets used for **optimization and tuning**. This will create N checkpoints, each one optimized for the target dataset. |
 | `logger.wandb.offline=False` | Enables **online** tracking using **Weights & Biases (WandB)**. |
