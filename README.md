@@ -28,17 +28,18 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 
 ```plaintext
 📁 htr_ood/
+│── 📂 configs/         # Configuration files
+│── 📂 data/            # Data used for the experiments
+│── 📂 docker/          # Contain Dockerfile
+│── 📂 scripts/         # Scripts for launching complete experiments
 │── 📂 src/             # Core implementation
-│── 📂 models/          # Pre-trained and baseline models
-│── 📂 datasets/        # Data preparation scripts
-│── 📂 evaluation/      # OOD analysis and generalization metrics
+│── 📂 models/          # Modules and architectures implementations
 │── 📜 requirements.txt # Required dependencies
 │── 📜 README.md        # Project documentation
-│── 📜 LICENSE          # License information
-│── 📜 train.py         # Training script
-│── 📜 test.py          # Model evaluation script
-│── 📜 ood_analysis.py  # Out-of-distribution analysis
 ```
+
+<!-- │── 📜 ood_analysis.py  # Out-of-distribution analysis -->
+<!-- │── 📜 LICENSE          # License information -->
 
 ---
 
@@ -87,13 +88,28 @@ We evaluate generalization performance on the following handwritten text dataset
 | St. Gall   | Latin    | 9-12th c.    | 1       | saint_gall     |
 | G.Washington | English | 1755        | 1       | washington     |
 | Rodrigo    | Spanish  | 1545         | 1       | rodrigo        |
-| ICFHR2016  | German   | 15-19th c.   | Unknown | icfhr_2016     |
+| ICFHR $_{2016}$  | German   | 15-19th c.   | Unknown | icfhr_2016     |
+
+### ✍🏻 Real data
+
+Links for downloading the datasets used in the paper:
+* IAM: Images [lines](https://fki.tic.heia-fr.ch/DBs/iamDB/data/lines.tgz) and [lines GT](https://fki.tic.heia-fr.ch/DBs/iamDB/data/xml.tgz)
+* Rimes: [Complete](https://storage.teklia.com/public/rimes2011/RIMES-2011-Lines.zip). Link in: https://teklia.com/research/rimes-database/
+* Bentham: https://zenodo.org/records/44519. [Images](https://zenodo.org/records/44519/files/BenthamDatasetR0-Images.tbz?download=1) and [GT](https://zenodo.org/records/44519/files/BenthamDatasetR0-GT.tbz?download=1)
+* Saint Gall: [Complete](https://fki.tic.heia-fr.ch/DBs/iamHistDB/data/saintgalldb-v1.0.zip)
+* George Washington: [Complete](https://fki.tic.heia-fr.ch/DBs/iamHistDB/data/washingtondb-v1.0.zip)
+* Rodrigo: [Complete](https://zenodo.org/records/1490009/files/Rodrigo%20corpus%201.0.0.tar.gz?download=1)
+* ICFHR $_{2016}$: [Train and validation](https://zenodo.org/records/1164045/files/Train-And-Val-ICFHR-2016.tgz?download=1) [Test](https://zenodo.org/records/1164045/files/Test-ICFHR-2016.tgz?download=1)
+<!-- $``$ -->
 
 To download and preprocess datasets, use:
 
 ```bash
 python datasets/prepare_data.py --dataset IAM
 ```
+
+### 🤖 Synthetic data
+We downloaded the data from [1001fonts](https://www.1001fonts.com/handwritten-fonts.html) and we manually filtered them. We include the complete names of the synthetic fonts (about 3600 fonts) used in the following [file](TODO.com)
 
 ---
 
@@ -113,19 +129,18 @@ trainer.deterministic=False \
 model=crnn_puig \
 tokenizer=tokenizers/char_tokenizer \
 callbacks.early_stopping.patience=100 \
-callbacks.model_checkpoint_base.filename=crnn_michael_src_iam \
-callbacks.model_checkpoint_id.filename=\${callbacks.model_checkpoint_base.filename}_ID \
+callbacks.model_checkpoint_base.filename=crnn_puig_src_iam \
 callbacks/heldout_targets=[rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016] \
 callbacks/optim_targets=[iam,rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016] \
 logger.wandb.offline=False \
-logger.wandb.name=crnn_michael_src_iam \
+logger.wandb.name=crnn_puig_src_iam \
 train=True 
 ```
 
 ### 📜 Explanation of Parameters
 
 | Parameter | Description |
-|-----------|------------|
+|-----------|-------------|
 | `data/train/train_config/datasets=[iam]` | Specifies the dataset used for training (`IAM` in this case). |
 | `data/val/val_config/datasets=[iam,rimes,...]` | Specifies the dataset used for validation (`IAM` in this case). If not specified, by default all datasets will be used for validation and testing. 
 | `data/test/test_config/datasets=[iam,rimes,...]` | Specifies the dataset used for testing (`IAM` in this case). If not specified, by default all datasets will be used for validation and testing. 
@@ -163,7 +178,7 @@ python ood_analysis.py
 
 ---
 
-## 📈 Results
+<!-- ## 📈 Results
 
 ### 🔥 Key Observations:
 - **CTC-based models** perform slightly better in OOD scenarios compared to Seq2Seq models.
@@ -191,7 +206,7 @@ We identified **textual divergence** as the main challenge for OOD generalizatio
 - Improve **synthetic-to-real adaptation** techniques.
 - Investigate **pretraining strategies for cross-lingual generalization**.
 
----
+--- -->
 
 ## 📜 Citation
 
