@@ -162,3 +162,6 @@ configs/local/default.yaml
 
 # Model checkpoints
 *.ckpt
+
+# Notebooks
+notebooks/
