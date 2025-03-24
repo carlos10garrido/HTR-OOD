@@ -2,6 +2,3 @@
 defaults:
   - datasets: # Contains DatasetConfig
     - iam
-    - washington
-    - saint_gall
-    - esposalles
