@@ -5,8 +5,6 @@ import torch
 from typing import List
 from unidecode import unidecode
 
-import tokenizers
-
 PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
 
 class Tokenizer: # Generic tokenizer class
