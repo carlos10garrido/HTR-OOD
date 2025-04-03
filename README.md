@@ -45,13 +45,50 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 
 ## 📦 Installation
 
-### 🐳 Dockerfile
+### 🐳 Docker
 You can set up the container by running:
 
 ```bash
-docker build -t htr-ood-test .
-# Create the container
+bash ./start_container.sh [IMAGE_NAME] [GPU_DEVICE] [SHM_SIZE_GB]
 ```
+This script will build and run a GPU Docker container with custom settings.
+---
+
+#### 🧾 Arguments
+
+| Argument        | Description                                 | Default            | Required |
+|-----------------|---------------------------------------------|--------------------|----------|
+| `IMAGE_NAME`    | Name to assign to the Docker image          | `htr-ood-image`    | No       |
+| `GPU_DEVICE`    | GPU ID to assign to the container           | `0`                | No       |
+| `SHM_SIZE_GB`   | Shared memory size in GB                    | `24`               | No       |
+
+---
+
+#### 🧪 Examples
+
+Run with default settings:
+
+```bash
+bash ./start_container.sh
+```
+
+Build and run using GPU 1 and a custom image name:
+
+```bash
+bash ./start_container.sh htr-ood-image 1
+```
+
+Run with 48GB shared memory:
+
+```bash
+bash ./start_container.sh htr-ood-image 0 48
+```
+
+
+```bash
+bash scripts/start_container.sh image_name device shm_size
+```
+
 
 OR, you can just set up your libraries by installing the requirements: 
 
