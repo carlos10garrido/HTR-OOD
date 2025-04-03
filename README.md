@@ -33,6 +33,7 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 │── 📂 docker/          # Contains Dockerfile
 │── 📂 scripts/         # Scripts for launching complete experiments
 │── 📂 src/             # Core implementation: modules, architectures, data reading, etc. 
+│── 🐳 Dockerfile       # Dockerfile required for setting up the environment
 │── 📜 requirements.txt # Required dependencies
 │── 📜 README.md        # Project documentation
 ```
@@ -48,7 +49,7 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 You can set up the container by running:
 
 ```bash
-docker build -t htr-ood-test docker/
+docker build -t htr-ood-test .
 # Create the container
 ```
 
