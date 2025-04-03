@@ -6,7 +6,7 @@ defaults:
   - _self_
   - data: htr
   - tokenizer: tokenizer
-  - model: transformer
+  - model: crnn_puig
   - callbacks: default
   - logger: wandb # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
