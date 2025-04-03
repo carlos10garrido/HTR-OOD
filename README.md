@@ -32,8 +32,7 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 │── 📂 data/            # Data used for the experiments
 │── 📂 docker/          # Contains Dockerfile
 │── 📂 scripts/         # Scripts for launching complete experiments
-│── 📂 src/             # Core implementation
-│── 📂 models/          # Modules and architectures implementations
+│── 📂 src/             # Core implementation: modules, architectures, data reading, etc. 
 │── 📜 requirements.txt # Required dependencies
 │── 📜 README.md        # Project documentation
 ```
@@ -46,22 +45,26 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 ## 📦 Installation
 
 ### 🐳 Dockerfile
-TODO: 
+You can set up the container by running:
 
+```bash
+docker build -t pytorch_HTR docker/
+```
+
+OR, you can just set up your libraries by installing the requirements: 
 
 ### 🔧 Requirements
-TODO: 
 - Python 3.8+
 - PyTorch >= 2.0
-- NumPy, OpenCV, Matplotlib, Pandas
-- WandB (optional for logging)
+- Wandb (optional for logging)
+- NumPy, OpenCV, Matplotlib, Pandas, Pillow
+- Others (mostly Hydra stuff)
 
 To install dependencies, run:
 
 ```bash
 pip install -r requirements.txt
 ```
-
 ---
 
 ## ⚙️ Models
@@ -218,7 +221,7 @@ tokenizer=tokenizers/char_tokenizer \
 logger.wandb.offline=False \
 logger.wandb.name=crnn_puig_src_iam_test \
 train=False
-+pretrained_checkpoint=crnn_puig_src_iam # This will load from checkpoints/ 'crnn_puig_src_iam.ckpt'
++pretrained_checkpoint=crnn_puig_src_iam # This will load from 'checkpoints/crnn_puig_src_iam.ckpt'
 ```
 
 
@@ -271,6 +274,8 @@ If you find our work useful, please cite:
 
 ## 🤝 Acknowledgments
 This research was supported by the Spanish Ministry of Science and Innovation through the LEMUR research project (PID2023-148259NB-I00), funded by MCIU/AEI/10.13039/501100011033/FEDER, EU, and the European Social Fund Plus (FSE+). The first author is supported by grant CIACIF/2021/465 from “Programa I+D+i de la Generalitat Valenciana”. This research was supported by the University of Alicante.
+
+This code uses the amazing [Hydra template repo](https://github.com/ashleve/lightning-hydra-template)  
 
 <!-- We thank the **HTR community** for their contributions to open-source datasets. -->
 
