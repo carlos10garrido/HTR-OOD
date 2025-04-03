@@ -236,7 +236,7 @@ class MetricLogger():
     self.logger.experiment.log({f'train_acc_epoch': train_loss, 'epoch': self.current_epoch})
     self.train_losses = []
     self.train_accs = []
-
+    
   def compute_heldout_domain_cer(self, val_cers):
     # Calculate heldout-domain CERs
     heldout_domain_cers = {}
