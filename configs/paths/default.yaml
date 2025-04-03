@@ -10,7 +10,7 @@ data_dir: ${paths.root_dir}/data/
 real_data: ${paths.data_dir}/htr_datasets/
 
 # path to synthetic data
-synthetic_data: ${paths.data_dir}/synth/
+synth_data: ${paths.data_dir}/synth/
 
 # path to logging directory
 log_dir: ${paths.root_dir}/logs/
