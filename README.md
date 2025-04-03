@@ -57,7 +57,7 @@ OR, you can just set up your libraries by installing the requirements:
 - Python 3.8+
 - PyTorch >= 2.0
 - Wandb (optional for logging)
-- NumPy, OpenCV, Matplotlib, Pandas, Pillow
+- NumPy, OpenCV, Pillow
 - Others (mostly Hydra stuff)
 
 To install dependencies, run:
@@ -74,7 +74,7 @@ We examined the following start-of-the-art models in the literature of HTR:
 | **CRNN**       | Puigcerver et al., 2017       | `crnn_puig.yaml`  | CRNN + CTC                     | CTC          | 9.6M           | **128 × 1024** |
 | **VAN**        | Coquenet et al., 2020       | `van_coquenet.yaml`   | Fully Convolutional Network (FCN) w. CTC | CTC       | 2.7M           | **64 × 1024**  |
 | **C-SAN**      | Arce et al., 2022       | `cnn_san_arce.yaml`  | CNN + Self Attention + CTC     | CTC          | 1.7M           | **128 × 1024** |
-| **HTR-VIT**    | L et al., 2025       | `htr_vit.yaml` | CNN + Vision Transformer + CTC | CTC          | 53.5M          | **64 × 512**   |
+| **HTR-VIT**    | Li et al., 2025       | `htr_vit.yaml` | CNN + Vision Transformer + CTC | CTC          | 53.5M          | **64 × 512**   |
 | **Kang**       | Kang et al., 2020       | `transformer_kang.yaml`  | ResNet + Transformer           | Seq2Seq      | 90M            | **64 × 2227**  |
 | **Michael**    | Michael et al., 2019       | `crnn_michael.yaml` | CRNN + Attention Decoder       | Hybrid       | 5M             | **64 × 1024**  |
 | **LT**         | Barrere et al., 2022       |`light_barrere.yaml`    | CNN + Transformer + CTC        | Hybrid       | 7.7M           | **128 × 1024** |
