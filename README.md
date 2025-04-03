@@ -48,7 +48,8 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 You can set up the container by running:
 
 ```bash
-docker build -t pytorch_HTR docker/
+docker build -t htr-ood-test docker/
+# Create the container
 ```
 
 OR, you can just set up your libraries by installing the requirements: 
