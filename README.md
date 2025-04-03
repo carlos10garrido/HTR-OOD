@@ -110,8 +110,10 @@ Links for downloading the datasets and splits used in the paper:
 * ICFHR $_{2016}$: [Train and validation](https://zenodo.org/records/1164045/files/Train-And-Val-ICFHR-2016.tgz?download=1) [Test](https://zenodo.org/records/1164045/files/Test-ICFHR-2016.tgz?download=1)
 <!-- $``$ -->
 
-1. Move all the files to a folder in data/[folder_data].
-2. In [folder_data] we should get the following (10) list of files executing: ```ls -1 data/[folder_data]```:
+#### Real data preparation:
+
+1. Move all the files to the data/ folder.
+2. In data/ we should get the following (10) list of files executing: ```ls -1 data```:
 ```bash
 BenthamDatasetR0-GT.tbz
 RIMES-2011-Lines.zip
@@ -127,7 +129,7 @@ xml.tar
 
 3. To preprocess and organize the datasets, use:
 ```bash
-bash scripts/prepare_data.sh [folder_data]
+bash scripts/prepare_data.sh data/
 ```
 
 
