@@ -17,7 +17,6 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from typing import Any, Dict, List, Optional, Tuple
 from lightning import LightningDataModule
-from datasets import load_dataset
 
 # Import opencv for binarization
 import cv2
@@ -38,16 +37,10 @@ from src.utils import pylogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 
 from src.data.data_utils import (
-    # tensor_transform,
-    # sequential_transforms,
-    # tokenize,
     collate_fn,
     has_glyph,
     generate_image,
     read_htr_fonts,
-    generate_line,
-    prepare_esposalles,
-    prepare_saint_gall,
 )
 
 class HTRDatasetSynthRandom(Dataset):
