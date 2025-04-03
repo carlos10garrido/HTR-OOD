@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📝 On the Generalization of Handwritten Text Recognition Models
+# 📝 On the Generalization of Handwritten Text Recognition Models (WIP)
 
 📄 **Paper**: [ArXiv Link](https://arxiv.org/html/2411.17332v1)  
 💻 **Code**: This repository  
