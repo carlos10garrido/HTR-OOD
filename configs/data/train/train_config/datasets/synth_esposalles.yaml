@@ -1,6 +1,0 @@
-synth_esposalles:
-  _target_: src.data.data_config.SynthDatasetConfig
-  name: synth_esposalles
-  words_path: ${paths.data_dir}/synth/esposalles.json
-  fonts_path: ${paths.data_dir}/synth/handwritten-fonts/
-  distr: True

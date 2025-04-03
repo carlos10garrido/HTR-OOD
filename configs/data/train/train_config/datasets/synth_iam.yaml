@@ -1,7 +1,6 @@
 synth_iam:
   _target_: src.data.data_config.SynthDatasetConfig
   name: synth_IAM
-  words_path: ${paths.data_dir}/synth/IAM.json
-  # fonts_path: ${paths.data_dir}/synth/handwritten-fonts/
-  fonts_path: ${paths.data_dir}/synth/handwritten-fonts_filtered/
+  words_path: ${paths.synth_data}/IAM.json
+  fonts_path: ${paths.synth_data}/handwritten-fonts_filtered/
   distr: True

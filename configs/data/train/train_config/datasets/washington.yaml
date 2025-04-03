@@ -1,7 +1,7 @@
 washington:
   _target_: src.data.data_config.DatasetConfig
   name: washington
-  images_path: ${paths.data_dir}/htr_datasets/washington/washingtondb-v1.0/data/line_images_normalized/ 
-  labels_path: ${paths.data_dir}/htr_datasets/washington/washingtondb-v1.0/ground_truth/
-  splits_path: ${paths.data_dir}/htr_datasets/washington/washingtondb-v1.0/sets/cv1/train.txt
+  images_path: ${paths.real_data}/washington/washingtondb-v1-3.0/data/line_images_normalized/ 
+  labels_path: ${paths.real_data}/washington/washingtondb-v1-3.0/ground_truth/
+  splits_path: ${paths.real_data}/washington/washingtondb-v1-3.0/sets/cv1/train.txt
   read_data: src.data.data_utils.read_data_washington

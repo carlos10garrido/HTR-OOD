@@ -1,7 +1,7 @@
 iam:
   _target_: src.data.data_config.DatasetConfig
   name: IAM
-  images_path: ${paths.data_dir}/htr_datasets/IAM/IAM_lines/
-  labels_path: ${paths.data_dir}/htr_datasets/IAM/IAM_xml/
-  splits_path: ${paths.data_dir}/htr_datasets/IAM/splits/train.txt
+  images_path: ${paths.real_data}/iam/iam/lines/
+  labels_path: ${paths.real_data}/iam/iam/xml/
+  splits_path: ${paths.real_data}/iam/iam/splits/train.txt
   read_data: src.data.data_utils.read_data_IAM

@@ -1,7 +1,0 @@
-esposalles:
-  _target_: src.data.data_config.DatasetConfig
-  name: esposalles
-  images_path: ${paths.data_dir}/esposalles/
-  labels_path: ${paths.data_dir}/esposalles/
-  splits_path: ${paths.data_dir}/esposalles/splits/val.txt
-  read_data: src.data.data_utils.read_data_esposalles

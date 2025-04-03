@@ -1,7 +1,7 @@
 icfhr_2016:
   _target_: src.data.data_config.DatasetConfig
   name: ICFHR_2016
-  images_path: ${paths.data_dir}/htr_datasets/icfhr_2016/lines/
-  labels_path: ${paths.data_dir}/htr_datasets/icfhr_2016/transcriptions/
-  splits_path: ${paths.data_dir}/htr_datasets/icfhr_2016/partitions/val.txt
+  images_path: ${paths.real_data}/icfhr_2016/lines/
+  labels_path: ${paths.real_data}/icfhr_2016/transcriptions/
+  splits_path: ${paths.real_data}/icfhr_2016/splits/val.txt
   read_data: src.data.data_utils.read_data_icfhr_2016

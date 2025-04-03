@@ -1,6 +1,6 @@
 synth_washington:
   _target_: src.data.data_config.SynthDatasetConfig
   name: synth_washington
-  words_path: ${paths.data_dir}/synth/washington.json
-  fonts_path: ${paths.data_dir}/synth/handwritten-fonts/
+  words_path: ${paths.synth_data}/washington.json
+  fonts_path: ${paths.synth_data}/handwritten-fonts/
   distr: True

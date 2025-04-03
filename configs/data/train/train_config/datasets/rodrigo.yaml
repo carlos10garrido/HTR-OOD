@@ -1,7 +1,7 @@
 rodrigo:
   _target_: src.data.data_config.DatasetConfig
   name: rodrigo
-  images_path: ${paths.data_dir}/htr_datasets/rodrigo/Rodrigo corpus 1.0.0/images/
-  labels_path: ${paths.data_dir}/htr_datasets/rodrigo/Rodrigo corpus 1.0.0/text/
-  splits_path: ${paths.data_dir}/htr_datasets/rodrigo/Rodrigo corpus 1.0.0/partitions/train.txt
+  images_path: ${paths.real_data}/rodrigo/Rodrigo corpus 1.0.0/images/
+  labels_path: ${paths.real_data}/rodrigo/Rodrigo corpus 1.0.0/text/
+  splits_path: ${paths.real_data}/rodrigo/Rodrigo corpus 1.0.0/partitions/train.txt
   read_data: src.data.data_utils.read_data_rodrigo
