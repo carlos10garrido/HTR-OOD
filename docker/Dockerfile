@@ -4,5 +4,10 @@ FROM nvcr.io/nvidia/pytorch:23.09-py3
 RUN pip install opencv-python
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
+WORKDIR /workspace
+
 # Install dependencies
-RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+COPY . .
