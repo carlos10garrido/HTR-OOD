@@ -72,10 +72,10 @@ Run with default settings:
 bash ./start_container.sh
 ```
 
-Build and run using GPU 1 and a custom image name:
+Build and run using GPU 0 and a custom image name:
 
 ```bash
-bash ./start_container.sh htr-ood-image 1
+bash ./start_container.sh htr-ood-image 0
 ```
 
 Run with 48GB shared memory:
