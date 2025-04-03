@@ -1,11 +1,8 @@
 # Create classes for 3 types of tokenizers: char-level, BPE, and SentencePiece. We'll use Hugging Face's tokenizers library to create these tokenizers.
 #
-import os
 import re
 import torch
-from typing import List, Tuple
-from tokenizers import Tokenizer, models, trainers, pre_tokenizers, decoders, processors
-from transformers.tokenization_utils import AddedToken, PreTrainedTokenizer
+from typing import List
 from unidecode import unidecode
 
 import tokenizers
