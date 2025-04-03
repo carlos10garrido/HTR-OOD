@@ -369,7 +369,6 @@ def read_data_icfhr_2016(images_path, lines_paths, files):
   with open(lines_paths + "transcriptions.txt", "r") as f:
     for line in f:
       image_id, text = line.split(" ", 1)
-      # print(f'Image id-{image_id}.Text-{text}')
 
       # Remove \n if exists in the text
       text = text.replace("\n", "")
@@ -424,126 +423,6 @@ def read_data_esposalles(images_path, words_path, files):
 
 
   return images_paths, words
-
-def read_data_parzival(images_path, words_path, files):
-  images_paths, words = [], []
-
-  # Convert files list to a set
-  files = set(files)
-  print(f'Files {files}')
-
-  # Read words from word_labels.txt
-  with open(words_path + "word_labels.txt", "r") as f:
-    for line in f:
-      image_id, text = line.split(" ")
-      image_id_split = image_id.split("-")
-
-      # Remove \n if exists in the text
-      text = text.replace("\n", "")
-      file = "-".join(image_id_split[:2])
-
-      # Check if first_part is in files
-      if file in files:
-        image_path = images_path + image_id + ".png"
-        text = text.replace("-", "").replace("|", " ")
-        text = text.replace("s_pt", ".").replace("s_cm", ",")
-        text = text.replace("s_mi", "-").replace("s_qo", ":")
-        text = text.replace("s_sq", ";").replace("s_et", "V")
-        text = text.replace("s_bl", "(").replace("s_br", ")")
-        text = text.replace("s_qt", "'").replace("s_GW", "G.W.")
-        text = text.replace("s_", "")
-
-        # Check if image_path exists
-        if os.path.exists(image_path):
-            images_paths.append(image_path)
-            words.append(text)
-
-  
-  return images_paths, words
-
-def prepare_esposalles(data_dir):
-  print(f'Preparing esposalles dataset')
-
-  # Check if exists esposalles/splits and create it if not
-  if not os.path.exists(data_dir + "/splits"):
-    print(f'Creating esposalles/splits')
-    os.makedirs(data_dir + "/splits", exist_ok=True)
-
-    # Put IEHHR_training_part1 + IEHHR_training_part2 folders in train.txt
-    with open(data_dir + "/splits/train.txt", "w") as f:
-      for file in os.listdir(data_dir + "/IEHHR_training_part1"):
-        f.write("/IEHHR_training_part1/" + file + "\n")
-      for file in os.listdir(data_dir + "/IEHHR_training_part2"):
-        f.write("/IEHHR_training_part2/" + file + "\n")
-
-    # Put IEHHR_training_part3 + IEHHR_training_part2 folders in validation.txt
-    with open(data_dir + "/splits/validation.txt", "w") as f:
-      for file in os.listdir(data_dir + "/IEHHR_training_part3"):
-        f.write("/IEHHR_training_part3/" + file + "\n")
-
-    # Put IEHHR_test folders in test.txt
-    with open(data_dir + "/splits/test.txt", "w") as f:
-      for file in os.listdir(data_dir + "/IEHHR_test"):
-        f.write("/IEHHR_test/Records/" + file + "\n")
-  else:
-    print(f'esposalles/splits already exists')
-
-def prepare_saint_gall(data_dir):
-  print(f'Preparing saint_gall dataset')
-
-  # Check if exists saint_gaill/data/words_images_normalized or is empty
-  if not os.path.exists(data_dir + "/data/words_images_normalized") \
-    or len(os.listdir(data_dir + "/data/words_images_normalized")) == 0:
-    print(f'Creating saint_gall/data/words_images_normalized')
-    os.makedirs(data_dir + "/data/words_images_normalized", exist_ok=True)
-
-    # Read words_location.txt and for each image crop it and save it in saint_gaill/data/words_images_normalized
-    with open(data_dir + "/ground_truth/word_location.txt", "r") as f:
-      for line in f:
-        image_path, _, locations = line.split(" ")
-        image_path_full = data_dir + '/data/line_images_normalized/' + image_path + ".png"
-        image = Image.open(image_path_full)
-
-        # Crop all locations images
-        for idx, location in enumerate(locations.split("|")):
-            x0, x1 = int(location.split("-")[0]), int(location.split("-")[1])
-
-            # Crop image
-            cropped_image = image.crop((x0, 0, x1, image.size[1]))
-
-            # Save image in words_images_normalized
-            cropped_image_path = data_dir + "/data/words_images_normalized/" + image_path + "-" + str(idx) + ".png"
-            print(f'Saving image in {cropped_image_path}')
-            cropped_image.save(cropped_image_path)
-
-    print(f'Parsed images from lines')
-
-  else:
-    print(f'Images from lines already parsed')   
-
-    # Set splits from random_split if not exists in splits folder
-    random_list_path = splits_path + "random_list.txt"
-
-    if os.path.exists(random_list_path):
-      print(f'Random list already exists')
-
-      # Divide random_list.txt in train, validation and test and rewrite
-      with open(random_list_path, "r") as f:
-          random_list = f.read().splitlines()
-
-          # Divide random_list in train, validation and test [0.6, 0.2, 0.2] and rewrite
-          n_train = int(len(random_list) * 0.6)
-          n_val = int(len(random_list) * 0.2)
-
-          # Write lines in train.txt, val.txt and test.txt
-          with open(splits_path + "train.txt", "w") as f:
-              f.write("\n".join(random_list[:n_train]))
-          with open(splits_path + "validation.txt", "w") as f:
-              f.write("\n".join(random_list[n_train:n_train+n_val]))
-          with open(splits_path + "test.txt", "w") as f:
-              f.write("\n".join(random_list[n_train+n_val:]))
-    else:
-        raise Exception(f'Random list not exists in {random_list_path}!')
 
 
 # Dilation class for transform using opencv
