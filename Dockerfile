@@ -10,4 +10,13 @@ WORKDIR /workspace
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
+# Optionally if you get an error with opencv
+# 1. download the autofix tool
+# pip install opencv-fixer==0.2.5
+# 2. execute
+# python -c "from opencv_fixer import AutoFix; AutoFix()"
+
+RUN pip install opencv-fixer==0.2.5
+RUN python -c "from opencv_fixer import AutoFix; AutoFix()"
+
 COPY . .
