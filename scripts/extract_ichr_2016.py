@@ -9,7 +9,9 @@ import sys
 import os
 import PIL
 from tqdm import tqdm
+
 print(f'SCRIPT TO EXTRACT ICFHR 2016 DATASET')
+
 # Read arguments to get the path to the dataset
 path_data = sys.argv[1]
 print(f'Path to the dataset: {path_data}')
@@ -20,8 +22,6 @@ for root, dirs, files in os.walk(path_data):
   for file in files:
     if file.endswith(".xml"):
       list_xml_icfhr_2016.append(os.path.join(root, file))
-      
-# print(sorted(list_xml_icfhr_2016))
 
 images_icfhr, gt_icfhr = [], []
 
@@ -110,23 +110,15 @@ namespace_map_name = None #'http://schema.primaresearch.org/PAGE/gts/pagecontent
 
 print(f'Parsing ICFHR-2016')
 for id_image, (xml_file, path_image) in tqdm(enumerate(zip(gt_icfhr, images_icfhr)), total=len(gt_icfhr)):
-  # path_xml_file = f'{path_data_icfhr_2016}{xml_file}'
   path_xml_file = xml_file
   xml_file = ''.join(xml_file.split("/")[-1])
-  # print(f'Id image: {id_image}')
-  # print(f'xml file: {xml_file}')
-  # print(f'Path image: {path_image}')
   path_image = path_image.replace("/page/", "/Images/")
-  # print(f'Path image (changed): {path_image}')
-  
-  # image = torchvision.io.read_image(f'{path_image}')
   image = PIL.Image.open(f'{path_image}')
   try:
     parsed_data = parse_textline_regions(path_xml_file, namespace_map_name)
   except Exception as e:
     print(f'Exception {e} in file {xml_file}')
     continue
-  # fig, ax = plt.subplots((len(parsed_data)), figsize=(100, 100))
 
   for idx, item in enumerate(parsed_data):
       text = item['Unicode']
@@ -137,13 +129,7 @@ for id_image, (xml_file, path_image) in tqdm(enumerate(zip(gt_icfhr, images_icfh
       cropped = image_pil.crop(bboxes)
       path_line_image = f'{path_images_to_save}{xml_file[:-4]}_{idx}.png'
       path_line_transcription = f'{path_transcriptions_to_save}{xml_file[:-4]}_{idx}.txt'
-      # print(f'Path line image: {path_line_image}')
-      # print(f'Path line transcription: {path_line_transcription}')
-
       cropped.save(path_line_image, 'PNG')
-
-      # with open(f'{path_line_transcription}', 'w') as f_transcription:
-      #   f_transcription.write(text)
       
       # Append to the end of transcriptions.txt the id_image <space> transcription
       with open(f'{path_transcriptions_to_save}transcriptions.txt', 'a') as f_transcription:
