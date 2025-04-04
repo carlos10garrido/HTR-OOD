@@ -3,7 +3,7 @@
 # Schedule execution of many runs
 model_name=$1
 img_size=$2
-script_name=$3 e.g. src/train_seq2seq.py
+script_name=$3 # e.g. src/train_seq2seq.py
 
 # Get all the checkpoints containing that model inside checkpoints folder
 echo "Inside folder $(pwd)"
