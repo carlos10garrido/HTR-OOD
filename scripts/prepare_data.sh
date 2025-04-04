@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Prepare and organize data for training, validation and testing for each dataset
-# It is assumed that there is a folder called $folder_name/$dataset with the raw data. 
 # It will create (or modify) a split file for each dataset and each stage (train, val, test)
 folder_name=$1 # It is the original folder name in which original files are stored
 datasets="iam rimes washington bentham saint_gall rodrigo icfhr_2016"
 
 mkdir -p $folder_name/htr_datasets # Real dataset folder
-mkdir -p $folder_name/synth/ # Synth dataset folder
+mkdir -p $folder_name/synth # Synth dataset folder
 
+# Organize real HTR datasets
 for dataset in $datasets
 do
   echo "Preparing $dataset dataset"
@@ -31,7 +31,6 @@ do
     mv $folder_name/$dataset/iam/splits/train.uttlist $folder_name/$dataset/iam/splits/train.txt
     mv $folder_name/$dataset/iam/splits/validation.uttlist $folder_name/$dataset/iam/splits/val.txt
     mv $folder_name/$dataset/iam/splits/test.uttlist $folder_name/$dataset/iam/splits/test.txt
-
   fi
   
   # Rimes
@@ -44,7 +43,6 @@ do
     mv $folder_name/$dataset/RIMES-2011-Lines/Sets/TrainLines.txt $folder_name/$dataset/RIMES-2011-Lines/Sets/train.txt
     mv $folder_name/$dataset/RIMES-2011-Lines/Sets/ValidationLines.txt $folder_name/$dataset/RIMES-2011-Lines/Sets/val.txt
     mv $folder_name/$dataset/RIMES-2011-Lines/Sets/TestLines.txt $folder_name/$dataset/RIMES-2011-Lines/Sets/test.txt
-
   fi
 
   # Washington
@@ -70,8 +68,6 @@ do
     mv $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/TrainLines.lst $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/train.txt
     mv $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/ValidationLines.lst $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/val.txt
     mv $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/TestLines.lst $folder_name/$dataset/BenthamDatasetR0-GT/Partitions/test.txt
-
-    # diff -r -q $folder_name/$dataset $folder_name/htr_datasets/bentham
   fi
 
   # Saint Gall
@@ -82,8 +78,6 @@ do
 
     # Just rename sets/cv1/valid.txt to sets/cv1/val.txt
     cat $folder_name/$dataset/saintgalldb-v1.0/sets/valid.txt > $folder_name/$dataset/saintgalldb-v1.0/sets/val.txt
-
-    # diff -r -q $folder_name/$dataset $folder_name/htr_datasets/saint_gall
   fi
 
   # Rodrigo
@@ -95,8 +89,6 @@ do
 
     # Just rename the files with the correct name since they exist
     mv $folder_name/$dataset/'Rodrigo corpus 1.0.0'/partitions/validation.txt $folder_name/$dataset/'Rodrigo corpus 1.0.0'/partitions/val.txt
-
-    # diff -r -q $folder_name/$dataset $folder_name/htr_datasets/rodrigo
   fi
   
   # ICFHR 2016
@@ -124,8 +116,6 @@ do
     script_python="python ./scripts/extract_ichr_2016.py $folder_name/$dataset" 
     echo $script_python
     eval $script_python
-
-    # diff -r -q $folder_name/$dataset $folder_name/htr_datasets/icfhr_2016
   fi
 
   # Remove all paths that contain __MACOSX in $folder_name/$datasettaset
@@ -136,4 +126,8 @@ do
 
 done
 
+# Organize synthetic HTR datasets
+unzip $folder_name/synth-data.zip -d $folder_name/
 
+# Create a folder for the fonts
+mkdir -p $folder_name/synth/fonts
