@@ -129,5 +129,8 @@ done
 # Organize synthetic HTR datasets
 unzip $folder_name/synth-data.zip -d $folder_name/
 
+# Remove synth-data folder to clean the structure
+rm -rf $folder_name/synth-data
+
 # Create a folder for the fonts
 mkdir -p $folder_name/synth/fonts
