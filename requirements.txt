@@ -13,7 +13,7 @@ hydra-core==1.3.2
 hydra-colorlog==1.2.0
 hydra-optuna-sweeper==1.2.0
 
-# --------- loggers --------- #
+# --------- loggers --------- # (uncomment if needed)
 wandb
 # neptune-client
 # mlflow
@@ -22,9 +22,7 @@ wandb
 
 # --------- others --------- #
 rootutils       # standardizing the project root setup
-pre-commit      # hooks for applying linters on commit
 rich            # beautiful text formatting in terminal
-pytest          # tests
 # sh            # for running bash commands in some tests (linux/macos only)
 Pillow>9.4.0    # for torchvision
 unidecode	# for encoding ascii text
