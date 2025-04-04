@@ -10,7 +10,7 @@ echo "Building Docker image as '$IMAGE_NAME'..."
 docker build -t "$IMAGE_NAME" .
 
 # Run the container
-echo "🚀 Running container from image '$IMAGE_NAME'..."
+echo "Running container from image '$IMAGE_NAME'..."
 docker run -itd --rm \
   --name "${IMAGE_NAME}-container" \
   --gpus device="$DEVICE" \
