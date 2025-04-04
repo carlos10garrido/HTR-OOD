@@ -50,7 +50,7 @@ This code uses the amazing [Hydra template repo](https://github.com/ashleve/ligh
 You can set up a container by running:
 
 ```bash
-bash ./start_container.sh [IMAGE_NAME] [GPU_DEVICE] [SHM_SIZE_GB]
+bash scripts/start_container.sh [IMAGE_NAME] [GPU_DEVICE] [SHM_SIZE_GB]
 ```
 
 This script will build and run a GPU Docker container with custom settings.
@@ -72,19 +72,19 @@ This script will build and run a GPU Docker container with custom settings.
 Run with default settings:
 
 ```bash
-bash ./start_container.sh
+bash scripts/start_container.sh
 ```
 
 Build and run using GPU 0, a custom image name and 20gb of shared memory:
 
 ```bash
-bash ./start_container.sh htr-ood-image 0 20
+bash scripts/start_container.sh htr-ood-image 0 20
 ```
 
 Run with 48GB shared memory:
 
 ```bash
-bash ./start_container.sh htr-ood-image 0 48
+bash scripts/start_container.sh htr-ood-image 0 48
 ```
 
 Then you can just execute the container:
@@ -184,10 +184,10 @@ Train-And-Val-ICFHR-2016.tar
 lines.tar
 saintgalldb-v1.0.zip
 splits.zip
+synth-data.zip
+vocab.txt
 washingtondb-v1-3.0.zip
 xml.tar
-vocab.txt
-synth-data.zip
 ```
 
 3. To preprocess and organize the datasets, use:
@@ -195,10 +195,24 @@ synth-data.zip
 bash scripts/prepare_data.sh data/
 ```
 
-4. We should get something similar to:
-TODO
-
-
+4. We should get something similar to this, executing:
+```bash
+tree -dL 3 data
+```
+```plaintext
+data/
+├── htr_datasets
+│   ├── bentham
+│   ├── iam
+│   ├── icfhr_2016
+│   ├── rimes
+│   ├── rodrigo
+│   ├── saint_gall
+│   └── washington
+└── synth
+    ├── fonts
+    └── wit_dataset
+```
 
 ---
 
@@ -256,26 +270,24 @@ Notes: all the checkpoints will be created by default in a folder checkpoints/
 
 ## 🧪 Evaluation (from pretrained checkpoint)
 
-To evaluate a trained model:
+To evaluate a pretrained model:
 
 ```bash
 python src/train_ctc.py \
 data/train/train_config/datasets=[iam] \
-data.train.train_config.img_size=[64,1024] \
-data.train.train_config.batch_size=16 \
+data.train.train_config.img_size=[128,1024] \
+data.train.train_config.batch_size=8 \
 data.train.train_config.binarize=True \
 data.train.train_config.num_workers=8 \
-data/test/test_config/datasets=[iam]
 trainer.max_epochs=500 \
 trainer.deterministic=False \
 model=crnn_puig \
 tokenizer=tokenizers/char_tokenizer \
 logger.wandb.offline=False \
 logger.wandb.name=crnn_puig_src_iam_test \
-train=False # Only testing will be performed
-+pretrained_checkpoint=crnn_puig_src_iam # This will load from 'checkpoints/crnn_puig_src_iam.ckpt'
+train=False \
++pretrained_checkpoint=crnn_puig_src_iam_check_datasets_ID
 ```
-
 
 ---
 
