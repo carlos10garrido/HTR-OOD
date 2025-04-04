@@ -2,5 +2,5 @@ wit_fr:
   _target_: src.data.data_config.SynthDatasetConfig
   name: wit_fr
   words_path: ${paths.synth_data}/wit_dataset/wit-dataset-fr-train.txt
-  fonts_path: ${paths.synth_data}/final_fonts_rendered/
+  fonts_path: ${paths.synth_data}/fonts/
   distr: True
