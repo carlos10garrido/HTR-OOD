@@ -1,11 +1,9 @@
-# Create classes for 3 types of tokenizers: char-level, BPE, and SentencePiece. We'll use Hugging Face's tokenizers library to create these tokenizers.
-#
 import re
 import torch
 from typing import List
 from unidecode import unidecode
 
-PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
+PAD_IDX, BOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
 
 class Tokenizer: # Generic tokenizer class
   def __init__(self, model_name: str, **kwargs) -> None:
@@ -32,7 +30,7 @@ class Tokenizer: # Generic tokenizer class
   def prepare_text(self, text: str) -> List[int]:
       # Add BOS and EOS tokens to the encoded text and return tensor
       return torch.cat([
-        torch.tensor([SOS_IDX]), 
+        torch.tensor([BOS_IDX]), 
         torch.tensor(self.encode(text)), 
         torch.tensor([EOS_IDX])
       ])
@@ -48,7 +46,7 @@ class CharTokenizer(Tokenizer):
 
     def decode(self, token_ids: List[int]) -> str:
         # Remove padding, BOS, and EOS tokens
-        # token_ids = [token_id for token_id in token_ids if token_id not in [PAD_IDX, SOS_IDX, EOS_IDX]]
+        # token_ids = [token_id for token_id in token_ids if token_id not in [PAD_IDX, BOS_IDX, EOS_IDX]]
         # Add tokens until EOS is found
         _token_ids = []
         for token_id in token_ids:
@@ -57,7 +55,7 @@ class CharTokenizer(Tokenizer):
             # Filter blank token CTC
             if token_id == self.vocab_size:
                 continue
-            if token_id not in [PAD_IDX, SOS_IDX]:
+            if token_id not in [PAD_IDX, BOS_IDX]:
               _token_ids.append(token_id)
         return "".join([self.ids_to_tokens[i] for i in _token_ids])
 
