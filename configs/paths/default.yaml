@@ -15,8 +15,8 @@ synth_data: ${paths.data_dir}/synth/
 # path to logging directory
 log_dir: ${paths.root_dir}/logs/
 
+# Path to checkpoints
 checkpoints_dir: ${paths.root_dir}/checkpoints/
-
 checkpoints_tokenizers: ${paths.root_dir}/checkpoints_tokenizers/
 
 # path to output directory, created dynamically by hydra
