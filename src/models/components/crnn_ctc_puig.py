@@ -1,7 +1,5 @@
 import torch
 from torch import nn
-
-# import tokenizers
 from src.data.components.tokenizers import Tokenizer
 
 class CRNN_Puig(nn.Module):
