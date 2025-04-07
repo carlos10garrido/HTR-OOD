@@ -63,101 +63,6 @@ def collate_fn(batch, img_size, text_transform):
     
     return images_batch, sequences_batch, padded_columns
   
-def get_bboxes(image: Image) -> Tuple:
-    """
-    Get the bounding boxes for the image at a pixel level
-    """
-    image = image.convert('L')
-    image = np.array(image)
-    # print(f'Image shape: {image.shape}')
-    # Get the bounding box for the image
-    bbox = np.where(image < 255)
-    
-    x_min, x_max = np.min(bbox[1]), np.max(bbox[1])
-    y_min, y_max = np.min(bbox[0]), np.max(bbox[0])
-    
-    bbox = (x_min, y_min, x_max, y_max) # (left, top, right, bottom)
-    
-    return bbox
-
-
-
-def generate_line(font, text, font_size, stroke_width=0, stroke_fill="#000000"):
-    # font = ImageFont.FreeTypeFont(font, font_size)
-    font = ImageFont.truetype(font, font_size)
-    bbox = font.getbbox(text)
-    
-    img_size = (int((bbox[2] - bbox[0]) * 2.7), int((bbox[3] - bbox[1]) * 2.7))
-    
-    img = Image.new('RGB', img_size, color = (255,255,255))
-    draw = ImageDraw.Draw(img)
-
-    draw.text((img_size[0]//10, img_size[1]//10), text, font=font, fill=(0, 0, 0), stroke_width=stroke_width, stroke_fill=stroke_fill)
-    
-    # print(f'Bbox with numpy: {get_bboxes(img)}')
-    
-    bbox = get_bboxes(img)
-    image = img.crop(bbox).convert('L')
-    
-    # Generate white image    
-    bboxes_chars, generated_chars = [], []
-    max_width, max_height, min_width, min_height = 0, 0, 10000, 10000
-    
-    for char in text:
-      img = Image.new("RGB", (img_size[0], img_size[1]), color=(255,255,255))
-      draw = ImageDraw.Draw(img)
-      draw.text((img_size[0]//10, img_size[1]//10), char, font=font, fill=(0,0,0), stroke_width=stroke_width, stroke_fill=stroke_fill)
-      
-      if char != ' ':
-        bbox = get_bboxes(img)
-        
-        # print(f'Bbox: {bbox} for char: {char}')
-        bboxes_chars.append(bbox)
-
-        w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-        max_width = max(max_width, w)
-        max_height = max(max_height, bbox[3])
-        min_width = min(min_width, w)
-        min_height = min(min_height, bbox[1])
-        data = np.array(img)
-        generated_chars.append(data)
-      else:
-        bbox = (0, 0, 0, 0)
-        bboxes_chars.append(bbox)
-        data = np.array(img)
-        generated_chars.append(data)
-      
-    # Iterate and reescale each character according to the max height and max width
-    reescaled_chars = []
-    
-    for gen_char, bbox in zip(generated_chars, bboxes_chars):
-      if bbox == (0, 0, 0, 0):
-        gen_char = Image.fromarray(gen_char)
-        gen_char = gen_char.resize((64, 64))
-        reescaled_chars.append(gen_char)
-        continue
-        
-        
-      char = Image.fromarray(gen_char)
-      bbox_x = (bbox[0] + (bbox[2] - bbox[0]) / 2) - max_width / 2, (bbox[0] + (bbox[2] - bbox[0]) / 2) + max_width / 2
-      bbox_y = (bbox[3] - max_height, bbox[3])
-      bbox_y = (min_height, max_height)
-
-      bbox = (bbox_x[0], bbox_y[0], bbox_x[1], bbox_y[1])
-      
-      # Bbox is left, top, right, bottom
-      char = char.crop(bbox)
-      char = char.resize((64, 64)) # WARNING, CHECK OTHER RESIZE SIZE
-      char = char.convert('L')
-      assert char.size == (64, 64), f'Char size: {char.size}'
-      
-      # Check number of dims == 2
-      assert len(np.array(char).shape) == 2, f'Char shape: {np.array(char).shape}'
-      reescaled_chars.append(char)
-      
-    return image, reescaled_chars
-
-
 def has_glyph(font, glyph):
     # print(font['cmap'])
     font = TTFont(font)
@@ -176,7 +81,6 @@ def generate_image(sequence, font, background_color=(255, 255, 255), text_color=
     for char in txt:
       if has_glyph(font_name, str(char)) is False:
         raise Exception(f'Font {font} cannot generate char {char}')
-
 
     # Generate white image
     img = Image.new("RGB", (img_size[0], img_size[1]), background_color)
@@ -283,7 +187,6 @@ def read_data_washington(images_path, lines_paths, files):
       # Remove \n if exists in the text
       text = text.replace("\n", "")
       file = image_id 
-      # file = "-".join(image_id_split[:2])
 
       # Check if first_part is in files
       if file in files:
@@ -389,41 +292,6 @@ def read_data_icfhr_2016(images_path, lines_paths, files):
             lines.append(text)
 
   return images_paths, lines
-
-def read_data_esposalles(images_path, words_path, files):
-  images_paths, words = [], []
-  # print(f'Files {files}')
-  for file in files:
-    folder_path = words_path + file
-    record_path = folder_path + '/words/'
-
-    transcription_path = record_path + file.split('/')[-1] + '_' + 'transcription.txt'
-    stage = "train"
-
-    if "test" in file:
-      stage = "test"
-      csv_path = words_path + file.split("/")[-2] + '/gt/' + file.split("/")[-1] + '_output.csv'
-      transcription_path = csv_path
-
-    # Read words/transcription.txt
-    with open(transcription_path, 'r') as f:
-      for line in f:
-        if stage == "test":
-          folder, word = line.split(",")[0], line.split(",")[1]
-        else:
-          folder, word = line.split(":")[0], line.split(":")[1]
-
-        image_path = record_path + folder + '.png'
-        word = word.replace("\n", "")
-
-        # Check if folder is in files
-        if os.path.exists(image_path):
-            images_paths.append(image_path)
-            words.append(word)
-
-
-  return images_paths, words
-
 
 # Dilation class for transform using opencv
 class Dilation(object):
