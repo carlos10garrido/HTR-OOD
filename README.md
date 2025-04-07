@@ -6,7 +6,7 @@
 💻 **Code**: This repository  
 ✍️ **Authors**: Carlos Garrido-Munoz and Jorge Calvo-Zaragoza  
 🏆 **Conference**: Accepted at CVPR 2025!  
-
+m
 </div>
 
 ---
@@ -34,8 +34,10 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 │── 📂 scripts/         # Scripts for launching complete experiments
 │── 📂 src/             # Core implementation: modules, architectures, data reading, etc. 
 │── 🐳 Dockerfile       # Dockerfile required for setting up the environment
+|── 🔧 Makefile         # Utility task for cleaning, syncing and project maintenance
 │── 📜 requirements.txt # Required dependencies
 │── 📜 README.md        # Project documentation
+│── 📜 LICENSE          # License information
 ```
 This code uses the amazing [Hydra template repo](https://github.com/ashleve/lightning-hydra-template) from ashleve.
 
@@ -214,6 +216,8 @@ data/
     └── wit_dataset
 ```
 
+❗️Warning: To use the synthetic fonts, you must include the .ttf files in the fonts/ folder.
+
 ---
 
 ## 🏗️ Training
@@ -233,11 +237,11 @@ trainer.deterministic=False \
 model=crnn_puig \
 tokenizer=tokenizers/char_tokenizer \
 callbacks.early_stopping.patience=100 \
-callbacks.model_checkpoint_base.filename=crnn_puig_src_iam_check_datasets \
+callbacks.model_checkpoint_base.filename=crnn_puig_src_iam_check \
 callbacks/heldout_targets=[rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016] \
 callbacks/optim_targets=[iam,rimes,washington,saint_gall,bentham,rodrigo,icfhr_2016] \
 logger.wandb.offline=False \
-logger.wandb.name=crnn_puig_src_iam_check_datasets \
+logger.wandb.name=crnn_puig_src_iam_check \
 train=True 
 ```
 
@@ -286,7 +290,7 @@ tokenizer=tokenizers/char_tokenizer \
 logger.wandb.offline=False \
 logger.wandb.name=crnn_puig_src_iam_test \
 train=False \
-+pretrained_checkpoint=crnn_puig_src_iam_check_datasets_ID
++pretrained_checkpoint=crnn_puig_src_iam_check_ID
 ```
 
 ---
