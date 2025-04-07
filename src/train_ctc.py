@@ -1,16 +1,13 @@
 import hydra
-from typing import List
-import pytorch_lightning as pl
+import os
 import rootutils
 import lightning as L
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from typing import List
+from lightning import LightningDataModule, LightningModule, Trainer
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import Logger
 from typing import Any, Dict, List, Optional, Tuple
-from hydra.core.config_store import ConfigStore
-import os
+
 
 from omegaconf import OmegaConf
 
