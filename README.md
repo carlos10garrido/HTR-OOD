@@ -108,7 +108,7 @@ pip install -r requirements.txt
 ---
 
 ## ⚙️ Models
-We examined the following start-of-the-art models in the literature of HTR:
+We examined the following state-of-the-art models in the literature of HTR:
 | **Model**       | **Citation** | **Config File (in configs/model/)**  | **Architecture**                           | **Alignment** | **Parameters** | **Input Size (H × W)** |
 |----------------|------------|--------------|--------------------------------|--------------|----------------|----------------|
 | **CRNN**       | Puigcerver et al., 2017       | `crnn_puig.yaml`  | CRNN + CTC                     | CTC          | 9.6M           | **128 × 1024** |
