@@ -7,15 +7,8 @@ from lightning import LightningDataModule, LightningModule, Trainer
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import Logger
 from typing import Any, Dict, List, Optional, Tuple
-
-
 from omegaconf import OmegaConf
 
-# Set precision for torch to bf16
-import torch
-# torch.set_default_tensor_type(torch.BFloat16Tensor)
-
-# import data_config as data_config
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
 from src.data.data_config import DatasetConfig, DataConfig
@@ -27,10 +20,8 @@ print(f'Importing modules...')
 from src.utils import (
     RankedLogger,
     extras,
-    get_metric_value,
     instantiate_callbacks,
     instantiate_loggers,
-    log_hyperparameters,
     task_wrapper,
 )
 
@@ -132,11 +123,10 @@ def main(cfg: DictConfig) -> Optional[float]:
     :param cfg: DictConfig configuration composed by Hydra.
     :return: Optional[float] with optimized metric value.
     """
-
+    
     print(f'Main for training HTR models for HTR!')
-    # train the model
     extras(cfg)
-
+    # train the model
     _ = train(cfg)
 
     return None

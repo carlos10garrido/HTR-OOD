@@ -134,9 +134,8 @@ def main(cfg: DictConfig) -> Optional[float]:
     """
 
     print(f'Main for training HTR models for HTR!')
-    # train the model
     extras(cfg)
-
+    # train the model
     _ = train(cfg)
 
     return None

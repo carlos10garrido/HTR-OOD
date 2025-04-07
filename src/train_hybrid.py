@@ -1,27 +1,18 @@
 import hydra
-from typing import List
-import pytorch_lightning as pl
+import os
+import torch
 import rootutils
 import lightning as L
-from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from typing import List
+from lightning import LightningDataModule, LightningModule, Trainer
 from omegaconf import DictConfig
 from lightning.pytorch.loggers import Logger
 from typing import Any, Dict, List, Optional, Tuple
-from hydra.core.config_store import ConfigStore
-import os
-import torch
-
 from omegaconf import OmegaConf
-
-from torch.profiler import profile, record_function, ProfilerActivity
-import torch.autograd.profiler as profiler
 
 # import data_config as data_config
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
-from src.data.data_config import DatasetConfig, DataConfig
 from src.data.htr_datamodule import HTRDataModule
 from src.models.hybrid_module import HybridModule
 
@@ -32,10 +23,8 @@ print(f'Importing modules...')
 from src.utils import (
     RankedLogger,
     extras,
-    get_metric_value,
     instantiate_callbacks,
     instantiate_loggers,
-    log_hyperparameters,
     task_wrapper,
 )
 
@@ -100,8 +89,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
         OmegaConf.to_object(cfg.model)
     )
 
-    # logger[0].experiment.config.update(cfg.model)
-
     # Predict on test set
     log.info("Predicting on test set...")
     trainer: Trainer = hydra.utils.instantiate(
@@ -122,7 +109,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, float], Dict[str, Any]]:
       
     model = HybridModule.load_from_checkpoint(ckpt_path, net=model.net, datasets=cfg.get("data"), tokenizer=tokenizer) if ckpt_path is not None else model
     # model = torch.compile(model)
-    
 
     if cfg.train is True:
         print(f'TRAINING MODEL: {model}')
@@ -142,9 +128,8 @@ def main(cfg: DictConfig) -> Optional[float]:
     """
 
     print(f'Main for training HTR models for HTR!')
-    # train the model
     extras(cfg)
-
+    # train the model
     _ = train(cfg)
 
     return None
