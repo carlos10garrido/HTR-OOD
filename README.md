@@ -1,12 +1,12 @@
 <div align="center">
 
-# 📝 On the Generalization of Handwritten Text Recognition Models (WIP)
+# 📝 On the Generalization of Handwritten Text Recognition Models
 
 📄 **Paper**: [ArXiv Link](https://arxiv.org/html/2411.17332v1)  
 💻 **Code**: This repository  
 ✍️ **Authors**: Carlos Garrido-Munoz and Jorge Calvo-Zaragoza  
 🏆 **Conference**: Accepted at CVPR 2025!  
-m
+
 </div>
 
 ---
@@ -34,15 +34,12 @@ This repository provides the **official implementation of our CVPR 2025 paper**,
 │── 📂 scripts/         # Scripts for launching complete experiments
 │── 📂 src/             # Core implementation: modules, architectures, data reading, etc. 
 │── 🐳 Dockerfile       # Dockerfile required for setting up the environment
-|── 🔧 Makefile         # Utility task for cleaning, syncing and project maintenance
+|── 🔧 Makefile         # Utility tasks for cleaning, syncing and project maintenance
 │── 📜 requirements.txt # Required dependencies
 │── 📜 README.md        # Project documentation
 │── 📜 LICENSE          # License information
 ```
 This code uses the amazing [Hydra template repo](https://github.com/ashleve/lightning-hydra-template) from ashleve.
-
-<!-- │── 📜 ood_analysis.py  # Out-of-distribution analysis -->
-<!-- │── 📜 LICENSE          # License information -->
 
 ---
 
@@ -94,7 +91,6 @@ Then you can just execute the container:
 docker exec -it htr-ood-image-container bash
 ```
 
-
 OR, you can just set up your libraries by yourself installing the requirements: 
 
 ### 🔧 Requirements
@@ -125,7 +121,6 @@ We examined the following start-of-the-art models in the literature of HTR:
 | **VLT**        | Barrere et al., 2024       | `v_light_barrere.yaml`   | CNN + Transformer + CTC        | Hybrid       | 5.6M           | **128 × 1024** |
 
 
-
 ---
 
 ## 📊 Datasets
@@ -137,8 +132,8 @@ We evaluate generalization performance on the following handwritten text dataset
 | IAM        | English  | 1999         | 657     | iam            |
 | Rimes      | French   | 2011         | 1.3K    | rimes          |
 | Bentham    | English  | 18-19th c.   | 1       | bentham        |
-| St. Gall   | Latin    | 9-12th c.    | 1       | saint_gall     |
-| G.Washington | English | 1755        | 1       | washington     |
+| Saint Gall   | Latin    | 9-12th c.    | 1       | saint_gall     |
+| George Washington | English | 1755        | 1       | washington     |
 | Rodrigo    | Spanish  | 1545         | 1       | rodrigo        |
 | ICFHR2016  | German   | 15-19th c.   | Unknown | icfhr_2016     |
 
@@ -155,7 +150,7 @@ Links for downloading the datasets and splits used in the paper:
 <!-- $``$ -->
 
 ### 🤖 Synthetic data
-We downloaded the data from [1001fonts](https://www.1001fonts.com/handwritten-fonts.html) and we manually filtered them. We include the complete names of the synthetic fonts (about 3600 fonts) used in the following [file](TODO.com)
+We downloaded the data from [1001fonts](https://www.1001fonts.com/handwritten-fonts.html) and we manually filtered them. We include the complete names of the synthetic fonts (about 3600 fonts) used in the following [file](TODO.com).
 
 
 #### 📚 Dataset Licensing and Attribution
@@ -251,6 +246,7 @@ This will start a run and start a project called "HTR-OOD" if you enter your Wan
 
 | Parameter | Description |
 |-----------|-------------|
+| `paths.data_dir='data/` | Specifies the root for the data directory. `data/` is used by default|
 | `data/train/train_config/datasets=[iam]` | Specifies the dataset used for training (`IAM` in this case). |
 | `data/val/val_config/datasets=[iam,rimes,...]` | Specifies the dataset used for validation (`IAM` in this case). If not specified, by default all datasets will be used for validation. 
 | `data/test/test_config/datasets=[iam,rimes,...]` | Specifies the dataset used for testing (`IAM` in this case). If not specified, by default all datasets will be used for testing. 
@@ -295,35 +291,6 @@ train=False \
 
 ---
 
-<!-- ## 📈 Results
-
-### 🔥 Key Observations:
-- **CTC-based models** perform slightly better in OOD scenarios compared to Seq2Seq models.
-- The **VAN model** shows the best generalization but only **outperforms others by ~1%**.
-- **Hybrid models** struggle the most in generalization.
-- **Using synthetic data improves OOD performance**, but choosing the right model is crucial.
-
-#### 🎯 Average Character Error Rate (CER) in OOD Scenarios:
-
-| Model       | IAM   | Rimes | Bentham | St. Gall | Rodrigo | Avg. CER (%) |
-|------------|------|------|--------|---------|--------|-------------|
-| CRNN       | 34.9 | 25.0 | 25.3   | 33.6    | 40.9   | 38.5        |
-| VAN        | 28.6 | 21.3 | 26.6   | 39.8    | 38.5   | **37.4**    |
-| HTR-ViT    | 33.7 | 28.3 | 33.3   | 36.5    | 38.5   | 41.2        |
-| Michael    | 49.1 | 35.5 | 43.5   | 55.3    | 65.3   | 53.9        |
-
-For full results, refer to our **[paper](https://arxiv.org/html/2411.17332v1)**.
-
----
-
-## 🔮 Future Work
-
-We identified **textual divergence** as the main challenge for OOD generalization in HTR models. Future research should:
-- Design **HTR architectures explicitly optimized for OOD generalization**.
-- Improve **synthetic-to-real adaptation** techniques.
-- Investigate **pretraining strategies for cross-lingual generalization**.
-
---- -->
 
 ## 📜 Citation
 
