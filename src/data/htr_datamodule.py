@@ -1,31 +1,12 @@
 # Datamodules for each Dataset
-import os
 import numpy as np
 import torch
 import pytorch_lightning as pl
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
-from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, RandomSampler
-import xml.etree.ElementTree as ET
-from torch.nn.utils.rnn import pad_sequence
-from typing import Iterable, List
-import json
-from torchvision.transforms import v2
-from fontTools.ttLib import TTFont
-from fontTools.unicode import Unicode
 import hydra
-from omegaconf import DictConfig, OmegaConf
-from typing import Any, Dict, List, Optional, Tuple
-from lightning import LightningDataModule
-
-# Import opencv for binarization
 import cv2
-
-import torchvision
-# import sklearn
-# from sklearn.cluster import KMeans
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, RandomSampler
 from unidecode import unidecode
-
 
 # Import data_config
 from src.data.data_config import DataConfig, DatasetConfig, SynthDatasetConfig, RandomSynthDatasetConfig
@@ -64,9 +45,7 @@ class HTRDatasetSynthRandom(Dataset):
 
     def generate_random_word(self, max_len):
         word = ""
-        # Set a x2 higher probability to select from [a-z] and [A-Z] than from the rest of the vocab
         chars = np.random.choice(len(self.vocab), size=np.random.randint(1, max_len), p=self.prob_vocab)
-        # chars = np.random.randint(len(self.vocab), size=np.random.randint(1, max_len), p=self.prob_vocab)
         for char in chars:
             word += self.vocab[char]
         return word
@@ -78,7 +57,6 @@ class HTRDatasetSynthRandom(Dataset):
             for c in sequence:
                 if has_glyph(font, str(c)) is False:
                     font = np.random.choice(self.fonts)
-                    # print(f'Selecting another font for generating {sequence}!. Cannot generate {c}')
                     break
             can_generate = True
 
@@ -103,7 +81,6 @@ class HTRDatasetSynthRandom(Dataset):
               generated = True
             except Exception as e:
               # print(f'Exception {e} while generating image with word {sequence} and font {font}.')
-              # sequence = self.generate_random_word(self.max_len)
               font = self.select_printable_font(sequence)
               counter_trials -= 1
               if counter_trials == 0:
@@ -158,7 +135,6 @@ class HTRDatasetSynth(Dataset):
     def __getitem__(self, idx):
         # Get sequence and read image
         sequence = self.sequences[idx] # Generate other sequence if len(sequence) == 0:
-        # print(f'Sequence: {sequence} to generate image')
         if len(sequence) == 0:
             # print(f'sequence {sequence} has length 0. Generating other sequence...')
             sequence = np.random.choice(self.sequences)
@@ -171,30 +147,15 @@ class HTRDatasetSynth(Dataset):
         sequence = sequence.strip()
         sequence = unidecode(sequence)
 
-            # print(f'Sequence too long. Selecting window of 50 characters: {sequence}')
-        
         font = np.random.choice(self.fonts)
-        # font = self.select_printable_font(sequence)
-        generated = False # Flag to check if image is generated correctly, if not, generate again
+        generated = False
 
-        # text_color = tuple(np.random.randint(0, 256, size=(1,)))
-        # text_color = (text_color[0], text_color[0], text_color[0])
-        # background_colors = tuple(np.random.randint(180, 256, size=(1,)))
-        # background_colors = (background_colors[0], background_colors[0], background_colors[0])
-        # text_color = (0,0,0)
-        # brown = (165, 42, 42)
         text_color = (0,0,0)
-        # grey background color = (192, 192, 192)
         background_colors = (255,255,255)
-        # background_colors = (114, 114, 114)
-
-
-        # print(f'Generating image with sequence {sequence} and font {font}')
 
         while not generated:
             try:
                 image = generate_image(sequence, font, background_colors, text_color)
-                # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
                 if self.transform is not None:
                     image = self.transform(image)
 
@@ -215,22 +176,8 @@ class HTRDatasetSynth(Dataset):
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
           # Binarize image with opencv Otsu algorithm
           _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-          
-        # image = Image.fromarray(image)
-
-        # # Binarize image using Opencv
-        # if len(image.shape) == 3:
-        #   # Convert to numpy array
-        #   # image = image.permute(1, 2, 0).numpy()
-        #   # print(f'Image shape: {image.shape}')
-        #   # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        #   # Binarize image with opencv Otsu algorithm
-        #   # _, image = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        #   # Convert to grayscale image using torchvision
-        #   image = torchvision.transforms.Grayscale()(image)
-
-        # print(f'GENERATED IMAGE WITH SEQUENCE {sequence} AND FONT {font}')
-                
+       
+       
         return image, sequence
 
 class HTRDataset(Dataset):
@@ -250,8 +197,6 @@ class HTRDataset(Dataset):
         image = cv2.imread(self.paths_images[idx])
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB) 
 
-        # Write image on outputs/ folder to check if image is read correctly
-
         if self.binarize:  
           # Convert to grayscale if image is not grayscale
           if len(image.shape) == 3:
@@ -261,9 +206,6 @@ class HTRDataset(Dataset):
 
         # Convert to PIL image
         image = Image.fromarray(image)
-
-        # Write image on disk to check if image is read correctly
-        # image.save(f'outputs/train_np_array{self.paths_images[idx].split("/")[-1]}')
 
         if self.transform:
           image = self.transform(image)
@@ -305,7 +247,7 @@ class HTRDataModule(pl.LightningDataModule):
 
         
     def prepare_data(self):
-        # download, split, tokenize, etc...
+        # Download, split, tokenize, etc...
         pass
        
     def setup(self, stage: str):
@@ -353,7 +295,6 @@ class HTRDataModule(pl.LightningDataModule):
                   distr = real_distr
                   htr_dataset = HTRDatasetSynth(sequences, distr, ds.fonts_path, transform=configs[_stage].transforms[0])
               
-              # TODO: REVIEW THIS VOCABULARY
               elif isinstance(ds, RandomSynthDatasetConfig):
                   htr_dataset =  HTRDatasetSynthRandom(self.vocab[5:], ds.words_to_generate, ds.max_len, ds.fonts_path, transform=configs[_stage].transforms[0])
                   print(f'Generating data with vocab {self.vocab[5:]}') # Remove special tokens from vocab and whitespace
