@@ -4,7 +4,6 @@ import torch.nn as nn
 from src.data.components.tokenizers import Tokenizer
 import math
 
-
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 200):
         super().__init__()
@@ -137,7 +136,6 @@ class V_Light_Barrere(nn.Module):
       self.tokenizer = tokenizer
       self.leaky_relu = nn.LeakyReLU()
 
-
       # CNN encoder (from the paper)
       # Except the last one, each convolutional block is composed of a 2D convolutional layer with a kernel of size 3×3, a stride of 1 and no padding. 
       # The last convolutional block uses a kernel size of 4×2 to better match the shape of a character [3,13]. 
@@ -200,8 +198,6 @@ class V_Light_Barrere(nn.Module):
       for p in self.parameters():
         if p.dim() > 1:
           nn.init.xavier_uniform_(p)
-
-      
 
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
@@ -292,12 +288,3 @@ class V_Light_Barrere(nn.Module):
 
 if __name__ == "__main__":
     _ = V_Light_Barrere()
-
-
-
-
-    
-
-
-      
-

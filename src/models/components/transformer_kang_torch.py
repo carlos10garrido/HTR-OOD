@@ -1,7 +1,6 @@
 
 import torch
 from torch import nn
-from PIL import Image
 import math
 from src.data.components.tokenizers import Tokenizer
 

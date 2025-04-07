@@ -116,15 +116,12 @@ class CRNN_Michael(nn.Module):
       # Linear layer is faster since it does not require permutation of the tensor
       self.ctc_pred = nn.Linear(self.hidden_size*2, self.vocab_size+1) # +1 for ctc blank token. These are H in the paper
       self.combine_c_h = nn.Linear(char_embedding_size + self.hidden_size, char_embedding_size + self.hidden_size, bias=True)
-      # self.act = nn.Tanh()
-      # self.act = nn.ReLU()
       self.act = nn.Identity()
       
       self.attention = ContentBasedAttention(self.hidden_size)
       self.conv1d = nn.Linear(self.vocab_size+1, self.hidden_size) # Conv1d layer for attention
       self.char_embedding = nn.Embedding(self.vocab_size, char_embedding_size)
       
-      # self.fc_context = nn.Linear(self.hidden_size*2, self.hidden_size) # Linear layer for context
       # Fully connected layer for context
       self.fc_context = nn.Sequential(
         nn.Linear(self.hidden_size*2, self.hidden_size),
@@ -161,7 +158,6 @@ class CRNN_Michael(nn.Module):
     
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
-      # breakpoint()
       # CNN encoder
       x = self.cnn_encoder(x)
       x = x.flatten(1, 2).permute(0, 2, 1)
@@ -205,7 +201,6 @@ class CRNN_Michael(nn.Module):
           
           # [batch_size, vocab_size]
           logit = self.output(out).squeeze(0) # Predict the next character
-          # logit_list.append(logit)
           logit_list[:, i] = logit.squeeze(1)
 
       return cnn_output.log_softmax(-1).permute(1, 0, 2), logit_list
@@ -222,7 +217,7 @@ class CRNN_Michael(nn.Module):
       cnn_output = self.ctc_pred(x)
       x = self.conv1d(cnn_output)
       x = self.pe_cross(x)
-      encoder_outputs = x#.clone()
+      encoder_outputs = x
       
       # Decoder
       batch_size, enc_sequence_length, enc_dim = x.size()
@@ -250,13 +245,11 @@ class CRNN_Michael(nn.Module):
           
           # [batch_size, vocab_size]
           logit = self.output(out).squeeze(0) # Predict the next character
-          # raw_preds.append(logit)
           raw_preds[:, i] = logit.squeeze(1)
 
           # Greedy Decoding
           logit = torch.argmax(logit, dim=-1)
-          output = logit #.unsqueeze(1) # [batch_size] - [batch_size, 1]
-          # output_list.append(logit)
+          output = logit
           output_list[:, i] = logit.squeeze(1)
           
       return output_list.detach(), raw_preds.detach()

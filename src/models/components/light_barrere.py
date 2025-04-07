@@ -4,7 +4,6 @@ import torch.nn as nn
 from src.data.components.tokenizers import Tokenizer
 import math
 
-
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 200):
         super().__init__()
@@ -193,8 +192,6 @@ class Light_Barrere(nn.Module):
         if p.dim() > 1:
           nn.init.xavier_uniform_(p)
 
-      
-
     # Training forward
     def forward(self, x: torch.Tensor, y: torch.tensor) -> torch.Tensor:
       # CNN encoder
@@ -235,7 +232,6 @@ class Light_Barrere(nn.Module):
       output = self.output(decoder_output)
 
       return pred_ctc_encoder, output
-
 
     # Inference forward
     def predict_greedy(self, x: torch.Tensor) -> torch.Tensor:
@@ -279,7 +275,6 @@ class Light_Barrere(nn.Module):
         next_token = self.output(decoder_output)[:,-1].argmax(dim=-1).unsqueeze(-1)
         output = torch.cat([output, next_token], dim=-1)
 
-      # breakpoint()
       return output[:, 1:], torch.stack(raw_output, dim=1)
 
 if __name__ == "__main__":
