@@ -4,7 +4,7 @@
 
 📄 **Paper**: [ArXiv Link](https://arxiv.org/html/2411.17332v1)  
 💻 **Code**: This repository  
-✍️ **Authors**: Carlos Garrido-Munoz and Jorge Calvo-Zaragoza  
+✍️ **Authors**: [Carlos Garrido-Munoz](https://scholar.google.com/citations?user=GK0kIJgAAAAJ&hl=es&oi=ao) and [Jorge Calvo-Zaragoza](https://scholar.google.com/citations?user=5jf1sfAAAAAJ&hl=es)  
 🏆 **Conference**: Accepted at CVPR 2025!  
 
 </div>
