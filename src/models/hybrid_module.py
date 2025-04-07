@@ -1,14 +1,11 @@
-from typing import Any, Dict, Tuple
 import torch
+from typing import Any, Dict, Tuple
 from lightning import LightningModule
 from torchmetrics.text import CharErrorRate as CER
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
 from src.data.components.tokenizers import Tokenizer
-from PIL import Image
-import wandb
-
 
 class HybridModule(LightningModule):
     def __init__(

@@ -1,10 +1,8 @@
 # Logger class to wrap-up logging functionality
 import torchmetrics
 import torch
-import torch.nn as nn
 import torchvision
 import wandb
-import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

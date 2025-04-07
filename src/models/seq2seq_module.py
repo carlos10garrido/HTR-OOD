@@ -1,25 +1,13 @@
-from typing import Any, Dict, Tuple
-
 import torch
+from typing import Any, Dict, Tuple
 from lightning import LightningModule
 from torchmetrics.text import CharErrorRate as CER
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
-import torchvision
-import os
-import src
 from src.data.components.tokenizers import Tokenizer
 
-import numpy as np
-# import cv2
-from PIL import Image
-import wandb
-
-# PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 1, 0, 2, 3
-
 class Seq2SeqModule(LightningModule):
-  
     def __init__(
         self,
         net: torch.nn.Module,
@@ -388,4 +376,4 @@ class Seq2SeqModule(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = MNISTLitModule(None, None, None, None)
+    _ = Seq2SeqModule(None, None, None, None)

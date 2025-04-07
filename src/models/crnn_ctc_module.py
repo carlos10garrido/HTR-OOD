@@ -1,17 +1,12 @@
-from typing import Any, Dict, Tuple
-
 import torch
 from lightning import LightningModule
+from typing import Any, Dict, Tuple
 from torchmetrics.text import CharErrorRate as CER
 from src.utils import pylogger
 from src.utils.logger import MetricLogger
+
 log = pylogger.RankedLogger(__name__, rank_zero_only=True)
-# import rootutils
-# rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
-import os 
-import src
-import wandb
-import torchvision
+
 from src.data.components.tokenizers import Tokenizer
 
 class CRNN_CTC_Module(LightningModule):
@@ -272,6 +267,9 @@ class CRNN_CTC_Module(LightningModule):
       dataloader_idx = 0 if len(self.test_datasets) == 1 else dataloader_idx
       dataset = self.test_datasets[dataloader_idx]
       
+      str_test_dataset = f'test_' + dataset
+      self.metric_logger.log_images(images, str_test_dataset)
+  
       raw_preds = self.net(images).squeeze(-1).clone()
       preds = raw_preds.clone().argmax(-1)
       
@@ -287,8 +285,6 @@ class CRNN_CTC_Module(LightningModule):
 
         _pred, _label = self.tokenizer.detokenize(_pred), self.tokenizer.detokenize(_label)
 
-        # print(f'Label: {_label} - Pred: {_pred}')
-
         # Calculate CER converting mayus to minus
         _label_minus = _label.lower()
         _pred_minus = _pred.lower()
@@ -302,9 +298,6 @@ class CRNN_CTC_Module(LightningModule):
         self.metric_logger.log_test_step_wer(_pred, _label, dataset)
         
         total_cer_per_batch += cer
-
-      # print(f'Total CER per batch: {total_cer_per_batch/images.shape[0]}')
-      
 
     def on_test_epoch_end(self) -> None:
         test_cer, test_wer = self.metric_logger.log_test_metrics()
