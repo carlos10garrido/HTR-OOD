@@ -3,10 +3,7 @@ import torch
 import os
 import numpy as np
 import torchvision
-import pytorch_lightning as pl
 from PIL import Image, ImageDraw, ImageFont
-from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 import xml.etree.ElementTree as ET
 from torch.nn.utils.rnn import pad_sequence
 from typing import Iterable, List
@@ -14,13 +11,10 @@ from fontTools.ttLib import TTFont
 import cv2
 import re
 import random as rnd
-from typing import Tuple
-
 
 from unidecode import unidecode
 
-PAD_IDX, SOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
-
+PAD_IDX, BOS_IDX, EOS_IDX, UNK_IDX = 2, 0, 1, 3
 
 def read_htr_fonts(fonts_path):
   fonts = []
@@ -370,5 +364,3 @@ class Degradations(object):
     image = Image.composite(img_pil_background_resized, image, Image.fromarray(mask))
     
     return image
-    
-    
