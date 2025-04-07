@@ -120,11 +120,3 @@ class CNN_SAN_Arce(nn.Module):
     
 if __name__ == "__main__":
     _ = CNN_SAN_Arce()
-
-
-
-    
-
-
-      
-
