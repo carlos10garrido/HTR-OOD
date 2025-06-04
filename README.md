@@ -2,7 +2,7 @@
 
 # 📝 On the Generalization of Handwritten Text Recognition Models
 
-📄 **Paper**: [ArXiv Link](https://arxiv.org/html/2411.17332v1)  
+📄 **Paper**: [ArXiv Link](https://arxiv.org/abs/2411.17332)  
 💻 **Code**: This repository  
 ✍️ **Authors**: [Carlos Garrido-Munoz](https://scholar.google.com/citations?user=GK0kIJgAAAAJ&hl=es&oi=ao) and [Jorge Calvo-Zaragoza](https://scholar.google.com/citations?user=5jf1sfAAAAAJ&hl=es)  
 🏆 **Conference**: Accepted at CVPR 2025!  
