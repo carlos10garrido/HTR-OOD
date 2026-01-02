@@ -297,11 +297,13 @@ train=False \
 If you find our work useful, please cite:
 
 ```bibtex
-@inproceedings{Garrido2025HTR,
-  author    = {Carlos Garrido-Muñoz and Jorge Calvo-Zaragoza},
-  title     = {On the Generalization of Handwritten Text Recognition Models},
-  booktitle = {CVPR},
-  year      = {2025}
+@InProceedings{garrido_cvpr_2025,
+    author    = {Garrido-Munoz, Carlos and Calvo-Zaragoza, Jorge},
+    title     = {On the Generalization of Handwritten Text Recognition Models},
+    booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+    month     = {June},
+    year      = {2025},
+    pages     = {15275-15286}
 }
 ```
 
